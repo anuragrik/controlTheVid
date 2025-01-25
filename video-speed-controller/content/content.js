@@ -6,7 +6,12 @@
       rewind: 10,
       opacity: 0.8
     },
-    activeVideo: null
+    activeVideo: null,
+    dragState: {
+      isDragging: false,
+      offsetX: 0,
+      offsetY: 0
+    }
   };
 
   const createController = (video) => {
@@ -16,7 +21,7 @@
     controller.className = 'vsc-controller';
     
     controller.innerHTML = `
-      <div class="vsc-display">1.0×</div>
+      <div class="vsc-display">1.00×</div>
       <div class="vsc-controls">
         <button class="vsc-btn vsc-slower">−</button>
         <button class="vsc-btn vsc-reset">⭮</button>
@@ -24,28 +29,51 @@
       </div>
     `;
 
-    const updatePosition = () => {
-      const rect = video.getBoundingClientRect();
-      controller.style.top = `${rect.top + 10}px`;
-      controller.style.left = `${rect.left + 10}px`;
+    // Smooth drag implementation
+    const startDrag = (e) => {
+      if (e.target.classList.contains('vsc-btn')) return;
+      state.dragState.isDragging = true;
+      const rect = controller.getBoundingClientRect();
+      state.dragState.offsetX = e.clientX - rect.left;
+      state.dragState.offsetY = e.clientY - rect.top;
+      controller.style.cursor = 'grabbing';
     };
 
-    const updateDisplay = () => {
-      if (video && !video.paused) {
-        // Force read the actual current playback rate
-        const currentRate = video.playbackRate;
-        controller.querySelector('.vsc-display').textContent = 
-          `${currentRate.toFixed(2)}×`;
-      }
+    const handleDrag = (e) => {
+      if (!state.dragState.isDragging) return;
+      
+      const videoRect = video.getBoundingClientRect();
+      const maxX = videoRect.width - controller.offsetWidth;
+      const maxY = videoRect.height - controller.offsetHeight;
+      
+      let newX = e.clientX - state.dragState.offsetX - videoRect.left;
+      let newY = e.clientY - state.dragState.offsetY - videoRect.top;
+
+      // Constrain to video bounds
+      newX = Math.max(0, Math.min(newX, maxX));
+      newY = Math.max(0, Math.min(newY, maxY));
+
+      controller.style.left = `${newX}px`;
+      controller.style.top = `${newY}px`;
     };
 
+    const stopDrag = () => {
+      state.dragState.isDragging = false;
+      controller.style.cursor = 'grab';
+    };
+
+    // Event listeners
+    controller.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', handleDrag);
+    document.addEventListener('mouseup', stopDrag);
+
+    // Speed control handlers
     const handleSpeedChange = (delta) => {
       video.playbackRate = Math.max(0.1, 
         Math.min(16, video.playbackRate + delta));
       updateDisplay();
     };
 
-    // Button event handlers
     controller.querySelector('.vsc-slower').addEventListener('click', (e) => {
       e.stopPropagation();
       handleSpeedChange(-state.settings.step);
@@ -62,56 +90,59 @@
       updateDisplay();
     });
 
-    // Video focus and state detection
-    video.addEventListener('click', () => {
-      state.activeVideo = video;
-    });
+    // Update display
+    const updateDisplay = () => {
+      controller.querySelector('.vsc-display').textContent = 
+        `${video.playbackRate.toFixed(2)}×`;
+    };
 
-    video.addEventListener('play', () => {
-      state.activeVideo = video;
-      updateDisplay(); // Update display when video starts playing
-    });
+    // Position controller relative to video
+    const positionController = () => {
+      const videoRect = video.getBoundingClientRect();
+      controller.style.left = `${videoRect.left + 10}px`;
+      controller.style.top = `${videoRect.top + 10}px`;
+    };
 
-    video.addEventListener('loadeddata', () => {
-      updateDisplay(); // Update display when video data is loaded
-    });
-
-    video.addEventListener('seeking', () => {
-      updateDisplay(); // Update display when video is seeked
-    });
-
-    // Initial setup
-    document.body.appendChild(controller);
+    // Initialize
+    video.parentElement.appendChild(controller);
     videoControllers.set(video, controller);
+    positionController();
     updateDisplay();
 
     // Observers
-    const resizeObserver = new ResizeObserver(updatePosition);
+    const resizeObserver = new ResizeObserver(() => {
+      if (!state.dragState.isDragging) positionController();
+    });
     resizeObserver.observe(video);
-    
+
     const mutationObserver = new MutationObserver(() => {
       if (!document.contains(video)) {
         controller.remove();
         videoControllers.delete(video);
         resizeObserver.disconnect();
-        mutationObserver.disconnect();
       }
     });
 
-    // Monitor playback rate changes
-    video.addEventListener('ratechange', () => {
-      requestAnimationFrame(updateDisplay); // Use rAF for smoother updates
+    video.addEventListener('ratechange', updateDisplay);
+    mutationObserver.observe(video.parentElement, {
+      childList: true,
+      subtree: true
     });
 
-    mutationObserver.observe(document.body, { childList: true, subtree: true });
-    updatePosition();
-    window.addEventListener('scroll', updatePosition, { passive: true });
+    // Cleanup event listeners
+    const cleanup = () => {
+      controller.removeEventListener('mousedown', startDrag);
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    };
+
+    return cleanup;
   };
 
   // Keyboard handler
   const handleKey = (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
-    
+
     const actions = {
       's': () => adjustSpeed(-state.settings.step),
       'd': () => adjustSpeed(state.settings.step),
@@ -156,9 +187,8 @@
   const updateActiveController = () => {
     if (state.activeVideo && videoControllers.has(state.activeVideo)) {
       const controller = videoControllers.get(state.activeVideo);
-      const currentRate = state.activeVideo.playbackRate;
       controller.querySelector('.vsc-display').textContent = 
-        `${currentRate.toFixed(2)}×`;
+        `${state.activeVideo.playbackRate.toFixed(2)}×`;
     }
   };
 
@@ -167,13 +197,6 @@
       if (!videoControllers.has(video) && video.offsetWidth > 50) {
         createController(video);
         if (!state.activeVideo) state.activeVideo = video;
-      } else if (videoControllers.has(video)) {
-        // Update existing controller display
-        const controller = videoControllers.get(video);
-        const display = controller.querySelector('.vsc-display');
-        if (display) {
-          display.textContent = `${video.playbackRate.toFixed(2)}×`;
-        }
       }
     });
   };
@@ -183,21 +206,13 @@
     Object.assign(state.settings, settings);
     trackVideos();
     
-    const observer = new MutationObserver(() => {
-      requestAnimationFrame(trackVideos); // Use rAF for smoother updates
-    });
-
-    observer.observe(document, {
+    new MutationObserver(trackVideos).observe(document, {
       childList: true,
       subtree: true
     });
 
     document.addEventListener('keydown', handleKey);
     window.addEventListener('resize', trackVideos);
-
-    // Additional events for dynamic content
-    document.addEventListener('play', () => trackVideos(), true);
-    document.addEventListener('loadeddata', () => trackVideos(), true);
   });
 
   chrome.storage.onChanged.addListener(changes => {

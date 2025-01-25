@@ -1,43 +1,32 @@
 .vsc-controller {
-    position: fixed;
+    position: absolute;
     z-index: 2147483647;
     display: flex;
     align-items: center;
-    gap: 0;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    gap: 8px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-family: system-ui;
+    font-size: 14px;
+    cursor: grab;
+    will-change: transform;
+  }
+  
+  .vsc-controller.grabbing {
+    cursor: grabbing;
   }
   
   .vsc-display {
-    background: rgba(0,0,0,0.7);
-    color: white;
-    padding: 4px 12px;
-    border-radius: 16px;
-    font-family: system-ui;
-    font-size: 14px;
+    min-width: 50px;
+    text-align: center;
     font-weight: 500;
-    transition: all 0.2s ease;
-    white-space: nowrap;
   }
   
   .vsc-controls {
     display: flex;
     gap: 4px;
-    opacity: 0;
-    transform: translateX(-10px);
-    transition: all 0.2s ease;
-  }
-  
-  .vsc-controller:hover .vsc-display {
-    border-radius: 16px 0 0 16px;
-  }
-  
-  .vsc-controller:hover .vsc-controls {
-    opacity: 1;
-    transform: translateX(0);
-    background: rgba(0,0,0,0.7);
-    border-radius: 0 16px 16px 0;
-    padding: 4px 12px 4px 8px;
   }
   
   .vsc-btn {
@@ -46,21 +35,15 @@
     border: none;
     background: rgba(255,255,255,0.1);
     color: white;
-    border-radius: 50%;
+    border-radius: 4px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
   }
   
   .vsc-btn:hover {
     background: rgba(255,255,255,0.2);
-    transform: scale(1.1);
-  }
-  
-  .vsc-btn:active {
-    transform: scale(0.95);
   }
   
   .vsc-slower {
