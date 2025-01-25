@@ -16,6 +16,9 @@
       --success: #22c55e;
       --success-bg: #dcfce7;
       --success-text: #166534;
+      --danger: #ef4444;
+      --danger-bg: #fee2e2;
+      --danger-text: #991b1b;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -30,6 +33,9 @@
         --success: #22c55e;
         --success-bg: #064e3b;
         --success-text: #4ade80;
+        --danger: #ef4444;
+        --danger-bg: #450a0a;
+        --danger-text: #f87171;
       }
     }
 
@@ -49,94 +55,69 @@
       padding: 32px 24px;
     }
 
-    .header {
-      margin-bottom: 32px;
-      text-align: center;
-    }
-
-    .header h1 {
-      font-size: 2.5rem;
+    h1 {
+      font-size: 1.875rem;
       font-weight: 600;
-      margin-bottom: 8px;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .header p {
-      color: var(--text-secondary);
-      font-size: 1.1rem;
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: 16px;
-      padding: 24px;
       margin-bottom: 24px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-      border: 1px solid var(--border);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
-    .card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 12px -1px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
-    }
-
-    .card h2 {
+    h2 {
       font-size: 1.25rem;
       font-weight: 600;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
       display: flex;
       align-items: center;
       gap: 8px;
     }
 
-    .card h2 svg {
-      width: 20px;
-      height: 20px;
-      color: var(--primary);
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
     .grid {
       display: grid;
-      gap: 20px;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
     }
 
     .input-group {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
     .input-group:last-child {
       margin-bottom: 0;
     }
 
-    .input-group label {
+    label {
       display: block;
-      margin-bottom: 8px;
       font-weight: 500;
-      color: var(--text);
+      margin-bottom: 4px;
     }
 
-    .input-group small {
+    small {
       display: block;
-      margin-top: 6px;
       color: var(--text-secondary);
       font-size: 0.875rem;
+      margin-top: 4px;
     }
 
     input[type="number"],
     input[type="text"],
     textarea {
       width: 100%;
-      padding: 10px 12px;
+      padding: 8px 12px;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-family: inherit;
+      border-radius: 6px;
       background: var(--card);
       color: var(--text);
+      font-size: 1rem;
       transition: border-color 0.2s ease;
     }
 
@@ -145,13 +126,11 @@
     textarea:focus {
       outline: none;
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
 
     textarea {
-      height: 120px;
+      height: 100px;
       resize: vertical;
-      line-height: 1.5;
     }
 
     .checkbox-group {
@@ -190,26 +169,167 @@
       z-index: 100;
     }
 
-    .save-btn {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-      color: white;
-      border: none;
-      padding: 12px 32px;
-      border-radius: 12px;
-      font-size: 1rem;
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.875rem;
       font-weight: 500;
       cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 12px 32px;
+      font-size: 1rem;
+      border-radius: 12px;
       box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
     }
 
-    .save-btn:hover {
+    .btn-primary:hover {
       transform: translateY(-1px);
       box-shadow: 0 6px 8px -1px rgba(59, 130, 246, 0.3);
     }
 
-    .save-btn:active {
-      transform: translateY(0);
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: var(--danger-text);
+    }
+
+    .btn-add {
+      background: var(--success);
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-add:hover {
+      background: var(--success-text);
+    }
+
+    .website-settings, .speed-profiles {
+      margin-bottom: 16px;
+      max-height: 1000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+
+    .website-settings.collapsed, .speed-profiles.collapsed {
+      max-height: 0;
+      margin-bottom: 0;
+    }
+
+    .website-settings.collapsed ~ .btn-add,
+    .website-settings.collapsed ~ small,
+    .website-settings.collapsed ~ .info-message,
+    .speed-profiles.collapsed ~ .btn-add,
+    .speed-profiles.collapsed ~ small,
+    .speed-profiles.collapsed ~ .info-message {
+      display: none;
+    }
+
+    input.invalid {
+      border-color: var(--danger) !important;
+      background-color: var(--danger-bg) !important;
+    }
+
+    input.invalid::placeholder {
+      color: var(--danger-text);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      cursor: pointer;
+    }
+
+    .section-header h2 {
+      margin-bottom: 0;
+    }
+
+    .section-header .collapse-btn {
+      padding: 4px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text);
+      transition: transform 0.3s ease;
+    }
+
+    .section-header .collapse-btn.collapsed {
+      transform: rotate(-180deg);
+    }
+
+    .website-item, .profile-item {
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .website-item {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .profile-item {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .profile-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .profile-settings {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      padding: 12px;
+      background: var(--card);
+      border-radius: 6px;
+    }
+
+    .website-input {
+      width: 100%;
+    }
+
+    .speed-input {
+      width: 80px;
+    }
+
+    .profile-name {
+      font-weight: 500;
+      width: 200px;
+    }
+
+    .profile-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .profile-item.active {
+      border-color: var(--primary);
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .btn-add {
+      margin-bottom: 8px;
     }
 
     .status {
@@ -244,70 +364,206 @@
 
     @keyframes fadeOut {
       to {
+        transform: translateY(100%);
         opacity: 0;
       }
+    }
+
+    .info-message {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      padding: 8px 12px;
+      background: rgba(59, 130, 246, 0.05);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .info-message svg {
+      color: var(--primary);
+      flex-shrink: 0;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Video Speed+</h1>
-    <p>Customize your video playback experience</p>
-  </div>
-  
+  <h1>
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <polyline points="12 6 12 12 16 14"></polyline>
+    </svg>
+    Video Speed+ Settings
+  </h1>
+
   <div class="card">
     <h2>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <polyline points="12 6 12 12 16 14"></polyline>
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20V10"></path>
+        <path d="M18 20V4"></path>
+        <path d="M6 20v-4"></path>
       </svg>
-      Speed Settings
+      Speed Controls
     </h2>
     <div class="grid">
       <div class="input-group">
         <label>Speed Step</label>
         <input type="number" id="step" step="0.1" min="0.1" max="2">
-        <small>Change amount per click (0.1 to 2)</small>
+        <small>Speed change increment (0.1 to 2)</small>
       </div>
       <div class="input-group">
         <label>Default Speed</label>
-        <input type="number" id="defaultSpeed" step="0.1" min="0.1" max="16" value="1">
+        <input type="number" id="defaultSpeed" step="0.1" min="0.1" max="16">
         <small>Initial video speed (0.1 to 16)</small>
       </div>
       <div class="input-group">
         <label>Reset Speed</label>
-        <input type="number" id="resetSpeed" step="0.1" min="0.1" max="16" value="1">
-        <small>Speed when clicking reset (0.1 to 16)</small>
+        <input type="number" id="resetSpeed" step="0.1" min="0.1" max="16">
+        <small>Speed when reset (0.1 to 16)</small>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <h2>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <div class="section-header" id="websiteSettingsHeader">
+      <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        Website Settings
+      </h2>
+      <button class="collapse-btn collapsed">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+      </button>
+    </div>
+    <div class="info-message">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"></circle>
-        <line x1="10" y1="15" x2="10" y2="9"></line>
-        <line x1="14" y1="15" x2="14" y2="9"></line>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
       </svg>
-      Time Control
+      <span>Refresh respective website after adding for changes to take effect</span>
+    </div>
+    <div id="websiteSettings" class="website-settings collapsed"></div>
+    <button id="addWebsite" class="btn btn-add">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Add Website
+    </button>
+    <small>Set default speeds for specific websites</small>
+  </div>
+
+  <div class="card">
+    <div class="section-header" id="speedProfilesHeader">
+      <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        Speed Profiles
+      </h2>
+      <button class="collapse-btn collapsed">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+      </button>
+    </div>
+    <div class="info-message">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>
+      <span>Refresh tabs after activating a profile for changes to take effect</span>
+    </div>
+    <div id="speedProfiles" class="speed-profiles collapsed"></div>
+    <button id="addProfile" class="btn btn-add">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Add Profile
+    </button>
+    <small>Create custom speed profiles for different types of content</small>
+  </div>
+
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20V10"></path>
+        <path d="M18 20V4"></path>
+        <path d="M6 20v-4"></path>
+      </svg>
+      Time Controls
     </h2>
     <div class="grid">
       <div class="input-group">
-        <label>Rewind Seconds</label>
+        <label>Rewind Time</label>
         <input type="number" id="rewind" min="1" max="60">
-        <small>Time to jump back (1 to 60)</small>
+        <small>Seconds to rewind (1 to 60)</small>
       </div>
       <div class="input-group">
-        <label>Advance Seconds</label>
+        <label>Advance Time</label>
         <input type="number" id="advance" min="1" max="60">
-        <small>Time to jump forward (1 to 60)</small>
+        <small>Seconds to advance (1 to 60)</small>
       </div>
     </div>
   </div>
 
   <div class="card">
     <h2>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+        <polyline points="7 3 7 8 15 8"></polyline>
+      </svg>
+      Keyboard Shortcuts
+    </h2>
+    <div class="grid">
+      <div class="input-group">
+        <label>Slower</label>
+        <input type="text" id="keySlow" class="key-input" maxlength="1">
+        <small>Decrease speed key</small>
+      </div>
+      <div class="input-group">
+        <label>Faster</label>
+        <input type="text" id="keyFast" class="key-input" maxlength="1">
+        <small>Increase speed key</small>
+      </div>
+      <div class="input-group">
+        <label>Reset</label>
+        <input type="text" id="keyReset" class="key-input" maxlength="1">
+        <small>Reset speed key</small>
+      </div>
+      <div class="input-group">
+        <label>Rewind</label>
+        <input type="text" id="keyRewind" class="key-input" maxlength="1">
+        <small>Rewind video key</small>
+      </div>
+      <div class="input-group">
+        <label>Advance</label>
+        <input type="text" id="keyAdvance" class="key-input" maxlength="1">
+        <small>Advance video key</small>
+      </div>
+      <div class="input-group">
+        <label>Toggle Controller</label>
+        <input type="text" id="keyToggle" class="key-input" maxlength="1">
+        <small>Show/hide controller key</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
       </svg>
       Appearance
@@ -332,7 +588,7 @@
 
   <div class="card">
     <h2>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
       </svg>
       Behavior
@@ -348,44 +604,7 @@
 
   <div class="card">
     <h2>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-      </svg>
-      Keyboard Shortcuts
-    </h2>
-    <div class="grid">
-      <div class="input-group">
-        <label>Decrease Speed</label>
-        <input type="text" id="keySlow" maxlength="1" class="key-input">
-      </div>
-      <div class="input-group">
-        <label>Increase Speed</label>
-        <input type="text" id="keyFast" maxlength="1" class="key-input">
-      </div>
-      <div class="input-group">
-        <label>Reset Speed</label>
-        <input type="text" id="keyReset" maxlength="1" class="key-input">
-      </div>
-      <div class="input-group">
-        <label>Rewind</label>
-        <input type="text" id="keyRewind" maxlength="1" class="key-input">
-      </div>
-      <div class="input-group">
-        <label>Advance</label>
-        <input type="text" id="keyAdvance" maxlength="1" class="key-input">
-      </div>
-      <div class="input-group">
-        <label>Show/Hide Controls</label>
-        <input type="text" id="keyToggle" maxlength="1" class="key-input">
-        <small>Press this key to show or hide the speed controls</small>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
         <line x1="12" y1="9" x2="12" y2="13"></line>
         <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -400,7 +619,7 @@
   </div>
 
   <div class="save-container">
-    <button id="save" class="save-btn">Save Settings</button>
+    <button id="save" class="btn btn-primary">Save Settings</button>
   </div>
   <div class="status" id="status"></div>
 

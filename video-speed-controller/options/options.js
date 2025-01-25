@@ -1,4 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize state object
+  const state = {
+    settings: null,
+    websiteSettingsCollapsed: true,
+    speedProfilesCollapsed: true
+  };
+
   // Cache DOM elements
   const elements = {
     step: document.getElementById('step'),
@@ -10,6 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
     hideController: document.getElementById('hideController'),
     rememberSpeed: document.getElementById('rememberSpeed'),
     disabledSites: document.getElementById('disabledSites'),
+    websiteSettings: document.getElementById('websiteSettings'),
+    speedProfiles: document.getElementById('speedProfiles'),
+    websiteSettingsHeader: document.getElementById('websiteSettingsHeader'),
+    speedProfilesHeader: document.getElementById('speedProfilesHeader'),
+    addWebsite: document.getElementById('addWebsite'),
+    addProfile: document.getElementById('addProfile'),
     keySlow: document.getElementById('keySlow'),
     keyFast: document.getElementById('keyFast'),
     keyReset: document.getElementById('keyReset'),
@@ -30,6 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
     hideController: false,
     rememberSpeed: false,
     disabledSites: [],
+    websiteSettings: {},
+    profiles: [],
+    activeProfile: null,
     keys: {
       slow: 's',
       fast: 'd',
@@ -77,6 +93,195 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   })();
 
+  // Create website settings item
+  const createWebsiteItem = (hostname = '', settings = {}) => {
+    const item = document.createElement('div');
+    item.className = 'website-item';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = hostname;
+    input.placeholder = 'example.com';
+    input.className = 'website-input';
+    input.required = true;
+
+    const speedInput = document.createElement('input');
+    speedInput.type = 'number';
+    speedInput.value = settings.defaultSpeed || 1.0;
+    speedInput.step = 0.1;
+    speedInput.min = 0.1;
+    speedInput.max = 16;
+    speedInput.className = 'speed-input';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'btn btn-danger';
+    removeBtn.textContent = '×';
+    removeBtn.onclick = () => item.remove();
+
+    // Add validation on input change
+    input.addEventListener('input', () => {
+      if (!input.value.trim()) {
+        input.classList.add('invalid');
+      } else {
+        input.classList.remove('invalid');
+      }
+    });
+
+    item.append(input, speedInput, removeBtn);
+    elements.websiteSettings.appendChild(item);
+  };
+
+  // Create profile item
+  const createProfileItem = (profile = { name: '', settings: {} }) => {
+    const item = document.createElement('div');
+    item.className = 'profile-item';
+    if (profile.name === state.settings?.activeProfile) {
+      item.classList.add('active');
+    }
+
+    const header = document.createElement('div');
+    header.className = 'profile-header';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = profile.name;
+    nameInput.placeholder = 'Profile Name';
+    nameInput.className = 'profile-name';
+    nameInput.required = true;
+
+    // Add validation on input change
+    nameInput.addEventListener('input', () => {
+      if (!nameInput.value.trim()) {
+        nameInput.classList.add('invalid');
+      } else {
+        nameInput.classList.remove('invalid');
+      }
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'profile-actions';
+
+    const activateBtn = document.createElement('button');
+    activateBtn.className = 'btn btn-primary';
+    activateBtn.textContent = profile.name === state.settings?.activeProfile ? 'Deactivate' : 'Activate';
+    activateBtn.onclick = async () => {
+      try {
+        const isActivating = !item.classList.contains('active');
+        
+        document.querySelectorAll('.profile-item').forEach(p => {
+          p.classList.remove('active');
+          p.querySelector('.btn-primary').textContent = 'Activate';
+        });
+
+        if (isActivating) {
+          item.classList.add('active');
+          activateBtn.textContent = 'Deactivate';
+          state.settings.activeProfile = nameInput.value.trim();
+        } else {
+          state.settings.activeProfile = null;
+        }
+
+        // Save settings first
+        await saveSettings();
+
+        // Then notify all tabs with proper error handling
+        try {
+          const tabs = await chrome.tabs.query({});
+          if (tabs) {
+            await Promise.all(tabs.map(tab => 
+              chrome.tabs.sendMessage(tab.id, { type: 'settingsUpdated' }).catch(() => {})
+            ));
+          }
+        } catch (error) {
+          console.warn('Error notifying tabs:', error);
+          // Continue execution even if tab notification fails
+        }
+      } catch (error) {
+        console.error('Error activating profile:', error);
+        showStatus('Error activating profile', true);
+      }
+    };
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'btn btn-danger';
+    removeBtn.textContent = '×';
+    removeBtn.onclick = async () => {
+      try {
+        if (item.classList.contains('active')) {
+          state.settings.activeProfile = null;
+        }
+        item.remove();
+        
+        // Save settings first
+        await saveSettings();
+
+        // Then notify all tabs with proper error handling
+        try {
+          const tabs = await chrome.tabs.query({});
+          if (tabs) {
+            await Promise.all(tabs.map(tab => 
+              chrome.tabs.sendMessage(tab.id, { type: 'settingsUpdated' }).catch(() => {})
+            ));
+          }
+        } catch (error) {
+          console.warn('Error notifying tabs:', error);
+          // Continue execution even if tab notification fails
+        }
+      } catch (error) {
+        console.error('Error removing profile:', error);
+        showStatus('Error removing profile', true);
+      }
+    };
+
+    actions.append(activateBtn, removeBtn);
+    header.append(nameInput, actions);
+
+    const settings = document.createElement('div');
+    settings.className = 'profile-settings';
+
+    // Add settings inputs
+    const settingsInputs = {
+      defaultSpeed: { label: 'Default Speed', type: 'number', step: 0.1, min: 0.1, max: 16 },
+      step: { label: 'Speed Step', type: 'number', step: 0.1, min: 0.1, max: 2 },
+      rewind: { label: 'Rewind Time', type: 'number', min: 1, max: 60 },
+      advance: { label: 'Advance Time', type: 'number', min: 1, max: 60 }
+    };
+
+    Object.entries(settingsInputs).forEach(([key, config]) => {
+      const group = document.createElement('div');
+      group.className = 'input-group';
+
+      const label = document.createElement('label');
+      label.textContent = config.label;
+
+      const input = document.createElement('input');
+      input.type = config.type;
+      input.value = profile.settings?.[key] || defaultSettings[key];
+      input.step = config.step;
+      input.min = config.min;
+      input.max = config.max;
+      input.dataset.setting = key;
+      input.addEventListener('change', async () => {
+        if (item.classList.contains('active')) {
+          // Save settings first
+          await saveSettings();
+
+          // Then notify all tabs
+          const tabs = await chrome.tabs.query({});
+          await Promise.all(tabs.map(tab => 
+            chrome.tabs.sendMessage(tab.id, { type: 'settingsUpdated' }).catch(() => {})
+          ));
+        }
+      });
+
+      group.append(label, input);
+      settings.appendChild(group);
+    });
+
+    item.append(header, settings);
+    elements.speedProfiles.appendChild(item);
+  };
+
   // Load settings with optimized error handling
   const loadSettings = async () => {
     try {
@@ -84,25 +289,37 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.sync.get(defaultSettings, resolve)
       );
       
-      const settings = { ...defaultSettings, ...items };
+      state.settings = { ...defaultSettings, ...items };
       
       // Batch DOM updates
       requestAnimationFrame(() => {
-        elements.step.value = settings.step;
-        elements.rewind.value = settings.rewind;
-        elements.advance.value = settings.advance;
-        elements.opacity.value = settings.opacity;
-        elements.defaultSpeed.value = settings.defaultSpeed;
-        elements.resetSpeed.value = settings.resetSpeed;
-        elements.hideController.checked = settings.hideController;
-        elements.rememberSpeed.checked = settings.rememberSpeed;
-        elements.disabledSites.value = (settings.disabledSites || []).join('\n');
-        elements.keySlow.value = settings.keys?.slow || 's';
-        elements.keyFast.value = settings.keys?.fast || 'd';
-        elements.keyReset.value = settings.keys?.reset || 'r';
-        elements.keyRewind.value = settings.keys?.rewind || 'z';
-        elements.keyAdvance.value = settings.keys?.advance || 'x';
-        elements.keyToggle.value = settings.keys?.toggle || 'v';
+        elements.step.value = state.settings.step;
+        elements.rewind.value = state.settings.rewind;
+        elements.advance.value = state.settings.advance;
+        elements.opacity.value = state.settings.opacity;
+        elements.defaultSpeed.value = state.settings.defaultSpeed;
+        elements.resetSpeed.value = state.settings.resetSpeed;
+        elements.hideController.checked = state.settings.hideController;
+        elements.rememberSpeed.checked = state.settings.rememberSpeed;
+        elements.disabledSites.value = (state.settings.disabledSites || []).join('\n');
+        elements.keySlow.value = state.settings.keys?.slow || 's';
+        elements.keyFast.value = state.settings.keys?.fast || 'd';
+        elements.keyReset.value = state.settings.keys?.reset || 'r';
+        elements.keyRewind.value = state.settings.keys?.rewind || 'z';
+        elements.keyAdvance.value = state.settings.keys?.advance || 'x';
+        elements.keyToggle.value = state.settings.keys?.toggle || 'v';
+
+        // Load website settings
+        elements.websiteSettings.innerHTML = '';
+        Object.entries(state.settings.websiteSettings || {}).forEach(([hostname, siteSettings]) => {
+          createWebsiteItem(hostname, siteSettings);
+        });
+
+        // Load profiles
+        elements.speedProfiles.innerHTML = '';
+        (state.settings.profiles || []).forEach(profile => {
+          createProfileItem(profile);
+        });
       });
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -113,6 +330,50 @@ document.addEventListener('DOMContentLoaded', () => {
   // Save settings with optimized validation and storage
   const saveSettings = debounce(async () => {
     try {
+      // Collect website settings with validation
+      const websiteSettings = {};
+      let hasEmptyWebsites = false;
+      elements.websiteSettings.querySelectorAll('.website-item').forEach(item => {
+        const hostname = item.querySelector('.website-input').value.trim().toLowerCase();
+        const speed = parseFloat(item.querySelector('.speed-input').value);
+        if (!hostname) {
+          item.querySelector('.website-input').classList.add('invalid');
+          hasEmptyWebsites = true;
+        } else if (!isNaN(speed)) {
+          websiteSettings[hostname] = { defaultSpeed: speed };
+        }
+      });
+
+      // Collect profiles with validation
+      const profiles = [];
+      let hasEmptyProfiles = false;
+      let activeProfile = null;
+      elements.speedProfiles.querySelectorAll('.profile-item').forEach(item => {
+        const name = item.querySelector('.profile-name').value.trim();
+        if (!name) {
+          item.querySelector('.profile-name').classList.add('invalid');
+          hasEmptyProfiles = true;
+        } else {
+          const settings = {};
+          item.querySelectorAll('.profile-settings input').forEach(input => {
+            const key = input.dataset.setting;
+            settings[key] = parseFloat(input.value);
+          });
+          
+          const profile = { name, settings };
+          if (item.classList.contains('active')) {
+            activeProfile = name;
+          }
+          profiles.push(profile);
+        }
+      });
+
+      // Show error if validation fails
+      if (hasEmptyWebsites || hasEmptyProfiles) {
+        showStatus('Please fill in all required fields', true);
+        return;
+      }
+
       const settings = {
         step: Math.max(0.1, Math.min(2, parseFloat(elements.step.value) || 0.1)),
         rewind: Math.max(1, Math.min(60, parseInt(elements.rewind.value) || 10)),
@@ -126,6 +387,9 @@ document.addEventListener('DOMContentLoaded', () => {
           .split('\n')
           .map(s => s.trim().toLowerCase())
           .filter(Boolean),
+        websiteSettings,
+        profiles,
+        activeProfile,
         keys: {
           slow: (elements.keySlow.value || 's').toLowerCase().charAt(0),
           fast: (elements.keyFast.value || 'd').toLowerCase().charAt(0),
@@ -136,7 +400,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       };
 
-      // Save settings to storage - this will trigger the onChanged event in content scripts
+      // Update state
+      state.settings = settings;
+
+      // Save settings to storage
       await new Promise(resolve => chrome.storage.sync.set(settings, resolve));
       showStatus('Settings saved successfully');
 
@@ -153,10 +420,36 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Error saving settings:', error);
       showStatus('Error saving settings', true);
     }
-  }, 50); // Reduced debounce time for faster response
+  }, 50);
 
-  // Optimize event listeners
-  elements.save.addEventListener('click', saveSettings, { passive: true });
+  // Add event listeners
+  elements.addWebsite.addEventListener('click', () => createWebsiteItem());
+  elements.addProfile.addEventListener('click', () => createProfileItem());
+  elements.save.addEventListener('click', saveSettings);
+
+  // Add collapsible functionality
+  const toggleSection = (section, header, isCollapsed) => {
+    const content = section;
+    const button = header.querySelector('.collapse-btn');
+    
+    if (isCollapsed) {
+      content.classList.add('collapsed');
+      button.classList.add('collapsed');
+    } else {
+      content.classList.remove('collapsed');
+      button.classList.remove('collapsed');
+    }
+  };
+
+  elements.websiteSettingsHeader.addEventListener('click', () => {
+    state.websiteSettingsCollapsed = !state.websiteSettingsCollapsed;
+    toggleSection(elements.websiteSettings, elements.websiteSettingsHeader, state.websiteSettingsCollapsed);
+  });
+
+  elements.speedProfilesHeader.addEventListener('click', () => {
+    state.speedProfilesCollapsed = !state.speedProfilesCollapsed;
+    toggleSection(elements.speedProfiles, elements.speedProfilesHeader, state.speedProfilesCollapsed);
+  });
 
   // Optimize keyboard shortcut handling
   const handleKeyboardSave = (e) => {
@@ -179,4 +472,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize settings
   loadSettings();
+
+  // Initialize collapsed state
+  toggleSection(elements.websiteSettings, elements.websiteSettingsHeader, true);
+  toggleSection(elements.speedProfiles, elements.speedProfilesHeader, true);
 });

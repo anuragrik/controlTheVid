@@ -21,7 +21,10 @@
         rewind: 'z',
         advance: 'x',
         toggle: 'v'
-      }
+      },
+      websiteSettings: {},  // Per-website settings
+      profiles: [],         // Custom speed profiles
+      activeProfile: null   // Currently active profile
     },
     activeVideo: null,
     lastSpeed: 1.0,
@@ -78,8 +81,41 @@
     return false;
   };
 
+  // Get active settings based on website and profile
+  const getActiveSettings = () => {
+    const hostname = window.location.hostname.replace('www.', '');
+    let settings = { ...state.settings };
+    
+    // Check website-specific settings first
+    if (state.settings.websiteSettings[hostname]) {
+      settings = {
+        ...settings,
+        ...state.settings.websiteSettings[hostname]
+      };
+    }
+    
+    // Then check active profile
+    if (state.settings.activeProfile) {
+      const activeProfile = state.settings.profiles.find(p => p.name === state.settings.activeProfile);
+      if (activeProfile?.settings) {
+        // Profile settings override website settings
+        settings = {
+          ...settings,
+          ...activeProfile.settings,
+          // Keep the keys from the original settings
+          keys: settings.keys
+        };
+      }
+    }
+    
+    return settings;
+  };
+
   const createController = (video) => {
     if (videoControllers.has(video) || isDisabledSite()) return;
+
+    // Get active settings for this website
+    const activeSettings = getActiveSettings();
 
     // Create elements once and cache them
     const controller = document.createElement('div');
@@ -116,12 +152,12 @@
       controller.style.display = 'none';
     }
 
-    // Set initial video speed
+    // Set initial video speed based on active settings
     const setInitialSpeed = () => {
       if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
         video.playbackRate = state.lastSpeed;
       } else {
-        video.playbackRate = state.settings.defaultSpeed;
+        video.playbackRate = activeSettings.defaultSpeed;
       }
     };
 
@@ -288,7 +324,7 @@
       }
     });
 
-    // Optimize speed control handlers with throttling
+    // Update speed control handlers to use active settings
     const handleSpeedChange = throttle((delta) => {
       video.playbackRate = Math.max(0.1, Math.min(16, video.playbackRate + delta));
       if (state.settings.rememberSpeed) {
@@ -298,12 +334,12 @@
       updateDisplay();
     }, 50);
 
-    // Use passive event listeners where possible
+    // Use active settings for speed step
     slowerBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
       if (!state.dragState.isDragging) {
-        handleSpeedChange(-state.settings.step);
+        handleSpeedChange(-activeSettings.step);
       }
     }, { passive: true });
 
@@ -311,7 +347,7 @@
       e.stopPropagation();
       e.preventDefault();
       if (!state.dragState.isDragging) {
-        handleSpeedChange(state.settings.step);
+        handleSpeedChange(activeSettings.step);
       }
     }, { passive: true });
 
@@ -319,7 +355,7 @@
       e.stopPropagation();
       e.preventDefault();
       if (!state.dragState.isDragging) {
-        video.playbackRate = state.settings.resetSpeed;
+        video.playbackRate = activeSettings.resetSpeed;
         if (state.settings.rememberSpeed) {
           state.lastSpeed = video.playbackRate;
           chrome.storage.sync.set({ lastSpeed: video.playbackRate });
@@ -473,7 +509,7 @@
     }
   }, true);
 
-  // Optimize keyboard handler with throttling
+  // Update keyboard handler to use active settings
   const handleKey = throttle((e) => {
     if (isDisabledSite()) return;
 
@@ -495,10 +531,11 @@
 
     if (isTyping) return;
 
+    const activeSettings = getActiveSettings();
     const key = e.key.toLowerCase();
     const actions = {
-      [state.settings.keys.slow]: () => adjustSpeed(-state.settings.step),
-      [state.settings.keys.fast]: () => adjustSpeed(state.settings.step),
+      [state.settings.keys.slow]: () => adjustSpeed(-activeSettings.step),
+      [state.settings.keys.fast]: () => adjustSpeed(activeSettings.step),
       [state.settings.keys.reset]: () => resetSpeed(),
       [state.settings.keys.rewind]: () => rewind(),
       [state.settings.keys.advance]: () => advance(),
@@ -511,8 +548,10 @@
     }
   }, 50);
 
+  // Update speed adjustment functions to use active settings
   const adjustSpeed = (delta) => {
     if (!state.activeVideo) return;
+    const activeSettings = getActiveSettings();
     state.activeVideo.playbackRate = Math.max(0.1, Math.min(16, state.activeVideo.playbackRate + delta));
     if (state.settings.rememberSpeed) {
       state.lastSpeed = state.activeVideo.playbackRate;
@@ -522,7 +561,8 @@
 
   const resetSpeed = () => {
     if (state.activeVideo) {
-      state.activeVideo.playbackRate = state.settings.resetSpeed;
+      const activeSettings = getActiveSettings();
+      state.activeVideo.playbackRate = activeSettings.resetSpeed;
       if (state.settings.rememberSpeed) {
         state.lastSpeed = state.activeVideo.playbackRate;
         chrome.storage.sync.set({ lastSpeed: state.activeVideo.playbackRate });
@@ -532,13 +572,15 @@
 
   const rewind = () => {
     if (state.activeVideo) {
-      state.activeVideo.currentTime -= state.settings.rewind;
+      const activeSettings = getActiveSettings();
+      state.activeVideo.currentTime -= activeSettings.rewind;
     }
   };
 
   const advance = () => {
     if (state.activeVideo) {
-      state.activeVideo.currentTime += state.settings.advance;
+      const activeSettings = getActiveSettings();
+      state.activeVideo.currentTime += activeSettings.advance;
     }
   };
 
@@ -559,9 +601,61 @@
     Object.assign(state.settings, settings);
     state.lastSpeed = lastSpeed;
 
+    // Listen for settings updates from options page
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'settingsUpdated') {
+        // Force immediate recreation of controllers
+        const oldControllers = new Map(videoControllers);
+        
+        // Remove all existing controllers first
+        oldControllers.forEach((controller, video) => {
+          controller.remove();
+          videoControllers.delete(video);
+          controllerPositions.delete(video);
+          videoStates.delete(video);
+          if (rafCallbacks.has(video)) {
+            cancelAnimationFrame(rafCallbacks.get(video));
+            rafCallbacks.delete(video);
+          }
+        });
+
+        // Reload settings and recreate controllers
+        chrome.storage.sync.get(null, items => {
+          // Update state with new settings
+          const { lastSpeed, ...newSettings } = items;
+          Object.assign(state.settings, newSettings);
+          state.lastSpeed = lastSpeed;
+
+          // Get fresh settings
+          const activeSettings = getActiveSettings();
+
+          // Recreate controllers for all videos
+          oldControllers.forEach((_, video) => {
+            if (video.offsetWidth > 50) {
+              // Apply speed settings immediately
+              if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
+                video.playbackRate = state.lastSpeed;
+              } else {
+                video.playbackRate = activeSettings.defaultSpeed;
+              }
+
+              // Force speed update
+              video.dispatchEvent(new Event('ratechange'));
+
+              // Create new controller
+              createController(video);
+            }
+          });
+        });
+        return true;
+      }
+    });
+
     // Single source of truth for settings updates
     chrome.storage.onChanged.addListener((changes, namespace) => {
       if (namespace === 'sync') {
+        const needsRecreation = changes.websiteSettings || changes.profiles || changes.activeProfile;
+        
         // Update settings first
         Object.keys(changes).forEach(key => {
           if (key === 'lastSpeed') {
@@ -570,26 +664,90 @@
             state.settings.keys = changes[key].newValue;
           } else if (key === 'disabledSites') {
             state.settings.disabledSites = Array.isArray(changes[key].newValue) ? changes[key].newValue : [];
+          } else if (key === 'websiteSettings') {
+            state.settings.websiteSettings = changes[key].newValue || {};
+          } else if (key === 'profiles') {
+            state.settings.profiles = changes[key].newValue || [];
+          } else if (key === 'activeProfile') {
+            state.settings.activeProfile = changes[key].newValue;
           } else {
             state.settings[key] = changes[key].newValue;
           }
         });
 
-        // Check disabled status after settings are updated
+        if (needsRecreation) {
+          // Store current controllers
+          const oldControllers = new Map(videoControllers);
+          
+          // Remove all existing controllers
+          oldControllers.forEach((controller, video) => {
+            controller.remove();
+            videoControllers.delete(video);
+            controllerPositions.delete(video);
+            videoStates.delete(video);
+            if (rafCallbacks.has(video)) {
+              cancelAnimationFrame(rafCallbacks.get(video));
+              rafCallbacks.delete(video);
+            }
+          });
+
+          // Get fresh settings
+          const activeSettings = getActiveSettings();
+
+          // Recreate controllers with new settings
+          oldControllers.forEach((_, video) => {
+            if (video.offsetWidth > 50) {
+              // Apply speed settings immediately
+              if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
+                video.playbackRate = state.lastSpeed;
+              } else {
+                video.playbackRate = activeSettings.defaultSpeed;
+              }
+
+              // Force speed update
+              video.dispatchEvent(new Event('ratechange'));
+
+              // Create new controller
+              createController(video);
+            }
+          });
+        } else {
+          // Handle normal settings updates
+          const activeSettings = getActiveSettings();
+
+          document.querySelectorAll('video').forEach(video => {
+            if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
+              video.playbackRate = state.lastSpeed;
+            } else {
+              video.playbackRate = activeSettings.defaultSpeed;
+            }
+
+            const controller = videoControllers.get(video);
+            if (controller) {
+              controller.style.opacity = state.settings.opacity;
+              if (state.settings.hideController) {
+                controller.style.display = 'none';
+              }
+
+              const display = controller.querySelector('.vsc-display');
+              if (display) {
+                display.textContent = `${video.playbackRate.toFixed(2)}×`;
+              }
+            }
+          });
+        }
+
+        // Handle disabled sites status
         const hostname = window.location.hostname.replace('www.', '');
         const isNowDisabled = state.settings.disabledSites.some(site => 
           hostname === site || hostname.endsWith('.' + site)
         );
         
-        // Handle site status changes immediately
         if (isNowDisabled) {
-          // Site is disabled - remove all controllers and reset speeds
           document.querySelectorAll('video').forEach(video => {
             const controller = videoControllers.get(video);
             if (controller) {
-              // Reset speed to default
               video.playbackRate = 1.0;
-              // Clean up and remove controller
               controller.remove();
               videoControllers.delete(video);
               controllerPositions.delete(video);
@@ -600,49 +758,12 @@
               }
             }
           });
-          // Remove event listeners if site is disabled
           document.removeEventListener('keydown', handleKey);
           window.removeEventListener('resize', () => requestAnimationFrame(trackVideos));
-        } else {
-          // Site is enabled - add controllers to all videos
-          document.querySelectorAll('video').forEach(video => {
-            const controller = videoControllers.get(video);
-            
-            if (!controller && video.offsetWidth > 50) {
-              createController(video);
-            } else if (controller) {
-              // Update existing controller properties
-              if (changes.opacity) {
-                controller.style.opacity = changes.opacity.newValue;
-              }
-              if (changes.hideController) {
-                controller.style.display = changes.hideController.newValue ? 'none' : 'block';
-              }
-              
-              // Handle speed-related changes
-              if (changes.defaultSpeed && !state.settings.rememberSpeed) {
-                video.playbackRate = changes.defaultSpeed.newValue;
-              }
-              if (changes.resetSpeed && video.playbackRate === changes.resetSpeed.oldValue) {
-                video.playbackRate = changes.resetSpeed.newValue;
-              }
-              if (changes.rememberSpeed) {
-                if (changes.rememberSpeed.newValue) {
-                  video.playbackRate = state.lastSpeed;
-                } else {
-                  video.playbackRate = state.settings.defaultSpeed;
-                }
-              }
-            }
-          });
-          
-          // Ensure event listeners are added
-          if (!document.onkeydown) {
-            document.addEventListener('keydown', handleKey);
-          }
-          if (!window.onresize) {
-            window.addEventListener('resize', () => requestAnimationFrame(trackVideos));
-          }
+        } else if (changes.disabledSites?.oldValue?.includes(hostname)) {
+          trackVideos();
+          document.addEventListener('keydown', handleKey);
+          window.addEventListener('resize', () => requestAnimationFrame(trackVideos));
         }
       }
     });
