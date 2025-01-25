@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     keyReset: document.getElementById('keyReset'),
     keyRewind: document.getElementById('keyRewind'),
     keyAdvance: document.getElementById('keyAdvance'),
+    keyToggle: document.getElementById('keyToggle'),
     save: document.getElementById('save'),
     status: document.getElementById('status')
   };
@@ -33,7 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
       fast: 'd',
       reset: 'r',
       rewind: 'z',
-      advance: 'x'
+      advance: 'x',
+      toggle: 'v'
     }
   };
 
@@ -80,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
       elements.keyReset.value = settings.keys?.reset || 'r';
       elements.keyRewind.value = settings.keys?.rewind || 'z';
       elements.keyAdvance.value = settings.keys?.advance || 'x';
+      elements.keyToggle.value = settings.keys?.toggle || 'v';
     } catch (error) {
       console.error('Error loading settings:', error);
       showStatus('Error loading settings', true);
@@ -107,7 +110,8 @@ document.addEventListener('DOMContentLoaded', () => {
           fast: (elements.keyFast.value || 'd').toLowerCase().charAt(0),
           reset: (elements.keyReset.value || 'r').toLowerCase().charAt(0),
           rewind: (elements.keyRewind.value || 'z').toLowerCase().charAt(0),
-          advance: (elements.keyAdvance.value || 'x').toLowerCase().charAt(0)
+          advance: (elements.keyAdvance.value || 'x').toLowerCase().charAt(0),
+          toggle: (elements.keyToggle.value || 'v').toLowerCase().charAt(0)
         }
       };
 

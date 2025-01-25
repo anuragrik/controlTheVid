@@ -17,7 +17,8 @@
         fast: 'd',
         reset: 'r',
         rewind: 'z',
-        advance: 'x'
+        advance: 'x',
+        toggle: 'v'
       }
     },
     activeVideo: null,
@@ -435,7 +436,8 @@
       [state.settings.keys.fast]: () => adjustSpeed(state.settings.step),
       [state.settings.keys.reset]: () => resetSpeed(),
       [state.settings.keys.rewind]: () => rewind(),
-      [state.settings.keys.advance]: () => advance()
+      [state.settings.keys.advance]: () => advance(),
+      [state.settings.keys.toggle]: () => toggleController()
     };
 
     if (actions[key]) {
@@ -473,6 +475,16 @@
     if (state.activeVideo) {
       state.activeVideo.currentTime += state.settings.advance;
     }
+  };
+
+  const toggleController = () => {
+    document.querySelectorAll('video').forEach(video => {
+      const controller = videoControllers.get(video);
+      if (controller) {
+        const isHidden = controller.style.display === 'none';
+        controller.style.display = isHidden ? 'flex' : 'none';
+      }
+    });
   };
 
   // Settings update handler
