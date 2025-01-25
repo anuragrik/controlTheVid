@@ -3,37 +3,109 @@
 <head>
   <meta charset="utf-8">
   <title>Video Speed+ Settings</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
   <style>
     :root {
-      --primary: #2563eb;
+      --primary: #3b82f6;
+      --primary-dark: #2563eb;
       --background: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+      --success: #22c55e;
+      --success-bg: #dcfce7;
+      --success-text: #166534;
     }
-    
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary: #60a5fa;
+        --primary-dark: #3b82f6;
+        --background: #0f172a;
+        --card: #1e293b;
+        --text: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --border: #334155;
+        --success: #22c55e;
+        --success-bg: #064e3b;
+        --success-text: #4ade80;
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: system-ui;
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 24px;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
       background: var(--background);
-      color: #1e293b;
+      color: var(--text);
+      line-height: 1.5;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header p {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
     }
 
     .card {
-      background: white;
-      border-radius: 12px;
+      background: var(--card);
+      border-radius: 16px;
       padding: 24px;
-      margin: 16px 0;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      margin-bottom: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--border);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 12px -1px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+    }
+
+    .card h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card h2 svg {
+      width: 20px;
+      height: 20px;
+      color: var(--primary);
     }
 
     .grid {
       display: grid;
-      gap: 16px;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     }
 
     .input-group {
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
 
     .input-group:last-child {
@@ -44,66 +116,114 @@
       display: block;
       margin-bottom: 8px;
       font-weight: 500;
+      color: var(--text);
     }
 
     .input-group small {
       display: block;
-      margin-top: 4px;
-      color: #64748b;
+      margin-top: 6px;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
     }
 
     input[type="number"],
-    input[type="text"] {
+    input[type="text"],
+    textarea {
       width: 100%;
-      padding: 8px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      background: var(--card);
+      color: var(--text);
+      transition: border-color 0.2s ease;
     }
 
-    input[type="checkbox"] {
-      margin-right: 8px;
+    input[type="number"]:focus,
+    input[type="text"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
 
     textarea {
-      width: 100%;
-      height: 100px;
-      padding: 8px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 14px;
-      font-family: inherit;
+      height: 120px;
       resize: vertical;
+      line-height: 1.5;
     }
 
-    button {
-      background: var(--primary);
+    .checkbox-group {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      transition: background-color 0.2s ease;
+    }
+
+    .checkbox-group:hover {
+      background-color: rgba(59, 130, 246, 0.05);
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      accent-color: var(--primary);
+    }
+
+    .key-input {
+      width: 60px !important;
+      text-align: center;
+      text-transform: lowercase;
+      font-family: monospace;
+      font-size: 1rem !important;
+    }
+
+    .save-container {
+      position: sticky;
+      bottom: 24px;
+      margin-top: 32px;
+      text-align: center;
+      z-index: 100;
+    }
+
+    .save-btn {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
       color: white;
       border: none;
-      padding: 10px 20px;
-      border-radius: 6px;
+      padding: 12px 32px;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 500;
       cursor: pointer;
-      font-size: 14px;
-      transition: opacity 0.2s;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
     }
 
-    button:hover {
-      opacity: 0.9;
+    .save-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 8px -1px rgba(59, 130, 246, 0.3);
+    }
+
+    .save-btn:active {
+      transform: translateY(0);
     }
 
     .status {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
-      padding: 12px 20px;
-      margin-top: 16px;
-      border-radius: 6px;
-      background: #dcfce7;
-      color: #166534;
-      display: none;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      background: var(--success-bg);
+      color: var(--success-text);
       font-weight: 500;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      display: none;
       animation: slideIn 0.3s ease;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
       z-index: 1000;
     }
 
@@ -118,97 +238,122 @@
       }
     }
 
-    @keyframes fadeOut {
-      from {
-        opacity: 1;
-      }
-      to {
-        opacity: 0;
-      }
-    }
-
     .status.fade-out {
       animation: fadeOut 0.3s ease forwards;
     }
 
-    .key-input {
-      width: 60px !important;
-      text-align: center;
-      text-transform: lowercase;
+    @keyframes fadeOut {
+      to {
+        opacity: 0;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>Video Speed+ Settings</h1>
+  <div class="header">
+    <h1>Video Speed+</h1>
+    <p>Customize your video playback experience</p>
+  </div>
   
   <div class="card">
-    <h2>Speed Settings</h2>
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      Speed Settings
+    </h2>
     <div class="grid">
       <div class="input-group">
         <label>Speed Step</label>
         <input type="number" id="step" step="0.1" min="0.1" max="2">
-        <small>How much to change speed on each click (0.1 to 2)</small>
+        <small>Change amount per click (0.1 to 2)</small>
       </div>
       <div class="input-group">
         <label>Default Speed</label>
         <input type="number" id="defaultSpeed" step="0.1" min="0.1" max="16" value="1">
-        <small>Default playback speed for videos (0.1 to 16)</small>
+        <small>Initial video speed (0.1 to 16)</small>
       </div>
       <div class="input-group">
         <label>Reset Speed</label>
         <input type="number" id="resetSpeed" step="0.1" min="0.1" max="16" value="1">
-        <small>Speed to reset to when clicking reset (0.1 to 16)</small>
+        <small>Speed when clicking reset (0.1 to 16)</small>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <h2>Time Control</h2>
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="10" y1="15" x2="10" y2="9"></line>
+        <line x1="14" y1="15" x2="14" y2="9"></line>
+      </svg>
+      Time Control
+    </h2>
     <div class="grid">
       <div class="input-group">
         <label>Rewind Seconds</label>
         <input type="number" id="rewind" min="1" max="60">
-        <small>Seconds to rewind (1 to 60)</small>
+        <small>Time to jump back (1 to 60)</small>
       </div>
       <div class="input-group">
         <label>Advance Seconds</label>
         <input type="number" id="advance" min="1" max="60">
-        <small>Seconds to advance (1 to 60)</small>
+        <small>Time to jump forward (1 to 60)</small>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <h2>Appearance</h2>
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+      </svg>
+      Appearance
+    </h2>
     <div class="grid">
       <div class="input-group">
         <label>UI Opacity</label>
         <input type="number" id="opacity" step="0.1" min="0.1" max="1">
-        <small>Controller opacity (0.1 to 1)</small>
+        <small>Controller transparency (0.1 to 1)</small>
       </div>
       <div class="input-group">
-        <label>
+        <div class="checkbox-group">
           <input type="checkbox" id="hideController">
-          Hide controller by default
-        </label>
-        <small>Only use keyboard shortcuts if hidden</small>
+          <div>
+            <label for="hideController">Hide controller by default</label>
+            <small>Use keyboard shortcuts when hidden</small>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <h2>Behavior</h2>
-    <div class="input-group">
-      <label>
-        <input type="checkbox" id="rememberSpeed">
-        Remember last speed
-      </label>
-      <small>Keep the last used speed when changing videos</small>
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+      </svg>
+      Behavior
+    </h2>
+    <div class="checkbox-group">
+      <input type="checkbox" id="rememberSpeed">
+      <div>
+        <label for="rememberSpeed">Remember last speed</label>
+        <small>Keep the same speed when changing videos</small>
+      </div>
     </div>
   </div>
 
   <div class="card">
-    <h2>Keyboard Shortcuts</h2>
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      Keyboard Shortcuts
+    </h2>
     <div class="grid">
       <div class="input-group">
         <label>Decrease Speed</label>
@@ -234,7 +379,14 @@
   </div>
 
   <div class="card">
-    <h2>Disabled Sites</h2>
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+      Disabled Sites
+    </h2>
     <div class="input-group">
       <label>Sites to disable extension on (one per line)</label>
       <textarea id="disabledSites" placeholder="example.com"></textarea>
@@ -242,7 +394,9 @@
     </div>
   </div>
 
-  <button id="save">Save Settings</button>
+  <div class="save-container">
+    <button id="save" class="save-btn">Save Settings</button>
+  </div>
   <div class="status" id="status"></div>
 
   <script src="options.js"></script>

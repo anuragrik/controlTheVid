@@ -466,6 +466,15 @@
         return hostname === site || hostname.endsWith('.' + site);
       });
       
+      // Store current video states before updating settings
+      const videoStates = new Map();
+      document.querySelectorAll('video').forEach(video => {
+        videoStates.set(video, {
+          speed: video.playbackRate,
+          controller: videoControllers.get(video)
+        });
+      });
+      
       // Update settings
       Object.assign(state.settings, message.settings);
       const isNowDisabled = isDisabledSite();
@@ -490,12 +499,6 @@
         // Site was just enabled - add controllers to all videos
         document.querySelectorAll('video').forEach(video => {
           if (!videoControllers.has(video) && video.offsetWidth > 50) {
-            // Set speed before creating controller
-            if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
-              video.playbackRate = state.lastSpeed;
-            } else {
-              video.playbackRate = state.settings.defaultSpeed;
-            }
             createController(video);
           }
         });
@@ -503,16 +506,17 @@
         // Site remains enabled - update existing controllers
         document.querySelectorAll('video').forEach(video => {
           const controller = videoControllers.get(video);
+          const previousState = videoStates.get(video);
+          
           if (controller) {
+            // Only update visual properties
             controller.style.opacity = state.settings.opacity;
             controller.style.display = state.settings.hideController ? 'none' : 'block';
             
-            // Handle speed changes based on remember speed setting
+            // Keep current speed unless remember speed setting changed
             if (state.settings.rememberSpeed && !wasRememberSpeed) {
               state.lastSpeed = video.playbackRate;
               chrome.storage.sync.set({ lastSpeed: video.playbackRate });
-            } else if (!state.settings.rememberSpeed) {
-              video.playbackRate = state.settings.defaultSpeed;
             }
           } else if (video.offsetWidth > 50) {
             // Create controller for any videos that don't have one
