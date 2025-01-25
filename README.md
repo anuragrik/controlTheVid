@@ -1,7 +1,5 @@
 # Video Speed+ 
 
-**Description:** Video speed control for all embedded video content.
-
 Video Speed+ is a Firefox browser extension that allows users to control the playback speed of videos embedded in websites. It's designed to work seamlessly with all embedded video content, giving you full control of your viewing experience.
 
 ---
