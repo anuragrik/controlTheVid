@@ -3,7 +3,16 @@
   "name": "Video Speed+",
   "version": "2.1",
   "description": "Robust video speed control for all embedded content",
-  "permissions": ["storage", "activeTab"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "video-speed-plus@cursor.so",
+      "strict_min_version": "57.0"
+    }
+  },
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
   "content_scripts": [{
     "matches": ["<all_urls>"],
     "js": ["content/content.js"],
@@ -13,12 +22,10 @@
   }],
   "options_ui": {
     "page": "options/options.html",
-    "chrome_style": false,
     "open_in_tab": true
   },
   "icons": {
     "48": "assets/icon-48.png",
-    "96": "assets/icon-96.png",
     "128": "assets/icon-128.png"
   }
 }

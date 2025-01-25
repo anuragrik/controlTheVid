@@ -15,6 +15,7 @@
       margin: 0 auto;
       padding: 24px;
       background: var(--background);
+      color: #1e293b;
     }
 
     .card {
@@ -28,22 +29,51 @@
     .grid {
       display: grid;
       gap: 16px;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    .input-group:last-child {
+      margin-bottom: 0;
     }
 
     .input-group label {
       display: block;
       margin-bottom: 8px;
       font-weight: 500;
-      color: #1e293b;
     }
 
-    input[type="number"], input[type="text"] {
+    .input-group small {
+      display: block;
+      margin-top: 4px;
+      color: #64748b;
+    }
+
+    input[type="number"],
+    input[type="text"] {
       width: 100%;
       padding: 8px 12px;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
       font-size: 14px;
+    }
+
+    input[type="checkbox"] {
+      margin-right: 8px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 100px;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
     }
 
     button {
@@ -53,6 +83,7 @@
       padding: 10px 20px;
       border-radius: 6px;
       cursor: pointer;
+      font-size: 14px;
       transition: opacity 0.2s;
     }
 
@@ -61,12 +92,49 @@
     }
 
     .status {
-      padding: 12px;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 12px 20px;
       margin-top: 16px;
       border-radius: 6px;
       background: #dcfce7;
       color: #166534;
       display: none;
+      font-weight: 500;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      animation: slideIn 0.3s ease;
+      z-index: 1000;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateY(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
+
+    .status.fade-out {
+      animation: fadeOut 0.3s ease forwards;
+    }
+
+    .key-input {
+      width: 60px !important;
+      text-align: center;
+      text-transform: lowercase;
     }
   </style>
 </head>
@@ -74,20 +142,68 @@
   <h1>Video Speed+ Settings</h1>
   
   <div class="card">
-    <h2>Core Settings</h2>
+    <h2>Speed Settings</h2>
     <div class="grid">
       <div class="input-group">
         <label>Speed Step</label>
         <input type="number" id="step" step="0.1" min="0.1" max="2">
+        <small>How much to change speed on each click (0.1 to 2)</small>
       </div>
+      <div class="input-group">
+        <label>Default Speed</label>
+        <input type="number" id="defaultSpeed" step="0.1" min="0.1" max="16" value="1">
+        <small>Default playback speed for videos (0.1 to 16)</small>
+      </div>
+      <div class="input-group">
+        <label>Reset Speed</label>
+        <input type="number" id="resetSpeed" step="0.1" min="0.1" max="16" value="1">
+        <small>Speed to reset to when clicking reset (0.1 to 16)</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Time Control</h2>
+    <div class="grid">
       <div class="input-group">
         <label>Rewind Seconds</label>
         <input type="number" id="rewind" min="1" max="60">
+        <small>Seconds to rewind (1 to 60)</small>
       </div>
+      <div class="input-group">
+        <label>Advance Seconds</label>
+        <input type="number" id="advance" min="1" max="60">
+        <small>Seconds to advance (1 to 60)</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Appearance</h2>
+    <div class="grid">
       <div class="input-group">
         <label>UI Opacity</label>
         <input type="number" id="opacity" step="0.1" min="0.1" max="1">
+        <small>Controller opacity (0.1 to 1)</small>
       </div>
+      <div class="input-group">
+        <label>
+          <input type="checkbox" id="hideController">
+          Hide controller by default
+        </label>
+        <small>Only use keyboard shortcuts if hidden</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Behavior</h2>
+    <div class="input-group">
+      <label>
+        <input type="checkbox" id="rememberSpeed">
+        Remember last speed
+      </label>
+      <small>Keep the last used speed when changing videos</small>
     </div>
   </div>
 
@@ -106,6 +222,23 @@
         <label>Reset Speed</label>
         <input type="text" id="keyReset" maxlength="1" class="key-input">
       </div>
+      <div class="input-group">
+        <label>Rewind</label>
+        <input type="text" id="keyRewind" maxlength="1" class="key-input">
+      </div>
+      <div class="input-group">
+        <label>Advance</label>
+        <input type="text" id="keyAdvance" maxlength="1" class="key-input">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Disabled Sites</h2>
+    <div class="input-group">
+      <label>Sites to disable extension on (one per line)</label>
+      <textarea id="disabledSites" placeholder="example.com"></textarea>
+      <small>Enter domain names without http:// or www.</small>
     </div>
   </div>
 

@@ -3,15 +3,14 @@
     z-index: 2147483647;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     background: rgba(28, 28, 28, 0.85);
     color: rgba(255, 255, 255, 0.95);
-    padding: 6px 10px;
-    border-radius: 8px;
-    font-family: system-ui;
-    font-size: 14px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font: 14px system-ui;
     cursor: grab;
-    backdrop-filter: blur(8px);
+    will-change: transform;
   }
   
   .vsc-controller.grabbing {
@@ -22,7 +21,6 @@
     min-width: 44px;
     text-align: center;
     font-weight: 500;
-    letter-spacing: 0.3px;
   }
   
   .vsc-controls {
@@ -30,42 +28,41 @@
     gap: 4px;
   }
   
-  /* Show controls horizontally by default */
+  .vsc-controller:hover .vsc-controls {
+    display: flex;
+  }
+  
+  /* Positioning */
   .vsc-controller[data-position="top"] .vsc-controls,
   .vsc-controller[data-position="bottom"] .vsc-controls,
   .vsc-controller[data-position="left"] .vsc-controls {
     flex-direction: row;
   }
   
-  /* Special case for right edge - vertical stacking */
   .vsc-controller[data-position="right"] {
     flex-direction: column;
     align-items: center;
-    padding: 8px;
+    padding: 6px;
   }
   
   .vsc-controller[data-position="right"] .vsc-controls {
     flex-direction: column;
-    margin-top: 6px;
+    margin-top: 4px;
     align-items: center;
-    width: 100%;
+  }
+  
+  .vsc-hover-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
   
   .vsc-controller[data-position="right"] .vsc-hover-container {
     flex-direction: column;
     align-items: center;
-    width: 100%;
   }
   
-  .vsc-controller[data-position="right"] .vsc-display {
-    text-align: center;
-    width: 100%;
-  }
-  
-  .vsc-controller:hover .vsc-controls {
-    display: flex;
-  }
-  
+  /* Button styles */
   .vsc-btn {
     all: unset;
     display: inline-flex;
@@ -73,51 +70,25 @@
     justify-content: center;
     width: 26px;
     height: 26px;
-    color: rgba(255, 255, 255, 0.9);
+    color: inherit;
     background: rgba(255, 255, 255, 0.08);
-    border-radius: 6px;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 16px;
+    font: inherit;
     user-select: none;
-    transition: all 0.15s ease;
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .vsc-btn::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgba(255, 255, 255, 0.05);
-    opacity: 0;
-    transition: opacity 0.15s ease;
+    transition: background-color 0.2s;
   }
   
   .vsc-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    transform: translateY(-1px);
-  }
-  
-  .vsc-btn:hover::after {
-    opacity: 1;
+    background: rgba(255, 255, 255, 0.15);
   }
   
   .vsc-btn:active {
-    transform: translateY(0);
+    background: rgba(255, 255, 255, 0.2);
   }
   
   .vsc-slower,
-  .vsc-faster {
-    font-weight: 500;
-    font-family: system-ui;
-  }
-  
+  .vsc-faster,
   .vsc-reset {
     font-size: 15px;
-  }
-
-  .vsc-hover-container {
-    display: flex;
-    align-items: center;
-    gap: 6px;
   }

@@ -5,9 +5,23 @@
     settings: {
       step: 0.1,
       rewind: 10,
-      opacity: 0.8
+      advance: 10,
+      opacity: 0.8,
+      defaultSpeed: 1.0,
+      resetSpeed: 1.0,
+      hideController: false,
+      rememberSpeed: false,
+      disabledSites: [],
+      keys: {
+        slow: 's',
+        fast: 'd',
+        reset: 'r',
+        rewind: 'z',
+        advance: 'x'
+      }
     },
     activeVideo: null,
+    lastSpeed: 1.0,
     dragState: {
       isDragging: false,
       offsetX: 0,
@@ -15,44 +29,61 @@
     }
   };
 
-  // Helper to detect if a point is in a control area
+  // Check if site is disabled
+  const isDisabledSite = () => {
+    const hostname = window.location.hostname.replace('www.', '');
+    return state.settings.disabledSites.some(site => 
+      hostname === site || hostname.endsWith('.' + site)
+    );
+  };
+
+  // Cache frequently used values
+  const CONTROL_HEIGHT = 40;
+  const MIN_MARGIN = 10;
+  const EDGE_MARGIN = 50;
+  const isYouTube = window.location.hostname.includes('youtube.com');
+  const isVimeo = window.location.hostname.includes('vimeo.com');
+
   const isInControlArea = (video, x, y) => {
-    // Common video player control heights
-    const controlHeight = 40;
-    const videoRect = video.getBoundingClientRect();
-    
-    // Check if we're in the bottom control area
-    if (y > videoRect.bottom - controlHeight) {
-      return true;
+    const rect = video.getBoundingClientRect();
+    if (y > rect.bottom - CONTROL_HEIGHT) return true;
+    if (isYouTube) {
+      if (y < rect.top + CONTROL_HEIGHT || y > rect.bottom - 100) return true;
     }
-
-    // YouTube-specific check (has controls at top and bottom)
-    if (window.location.hostname.includes('youtube.com')) {
-      // Top controls area
-      if (y < videoRect.top + controlHeight) {
-        return true;
-      }
-      // Bottom controls area (YouTube has taller controls)
-      if (y > videoRect.bottom - 100) {
-        return true;
-      }
-    }
-
-    // Check for common video hosting sites
-    if (window.location.hostname.includes('vimeo.com')) {
-      if (y > videoRect.bottom - 60) return true;
-    }
-
+    if (isVimeo && y > rect.bottom - 60) return true;
     return false;
   };
 
   const createController = (video) => {
-    if (videoControllers.has(video)) return;
+    if (videoControllers.has(video) || isDisabledSite()) return;
 
     const controller = document.createElement('div');
     controller.className = 'vsc-controller';
     
-    // Only prevent double click on the controller
+    // Apply opacity from settings
+    controller.style.opacity = state.settings.opacity;
+
+    // Hide controller if setting is enabled
+    if (state.settings.hideController) {
+      controller.style.display = 'none';
+    }
+
+    // Set initial video speed
+    if (state.settings.rememberSpeed) {
+      video.playbackRate = state.lastSpeed;
+    } else {
+      video.playbackRate = state.settings.defaultSpeed;
+    }
+
+    // Update lastSpeed when video rate changes
+    const handleRateChange = () => {
+      if (state.settings.rememberSpeed) {
+        state.lastSpeed = video.playbackRate;
+        chrome.storage.sync.set({ lastSpeed: video.playbackRate });
+      }
+    };
+    video.addEventListener('ratechange', handleRateChange);
+
     controller.addEventListener('dblclick', e => {
       e.stopPropagation();
       e.preventDefault();
@@ -62,7 +93,7 @@
     hoverContainer.className = 'vsc-hover-container';
 
     controller.innerHTML = `
-      <div class="vsc-display">1.00×</div>
+      <div class="vsc-display">${video.playbackRate.toFixed(2)}×</div>
       <div class="vsc-controls">
         <button class="vsc-btn vsc-slower">−</button>
         <button class="vsc-btn vsc-reset">⭮</button>
@@ -78,62 +109,44 @@
     hoverContainer.appendChild(controls);
     controller.appendChild(hoverContainer);
 
-    // Initialize position with safe area check
+    let isDragging = false;
+    let rafId = null;
+
     const getSafePosition = (pos) => {
-      const videoRect = video.getBoundingClientRect();
-      const controlHeight = 40;
-      const maxY = videoRect.height - controlHeight - controller.offsetHeight;
-      
+      const rect = video.getBoundingClientRect();
       return {
-        left: Math.max(10, Math.min(pos.left, videoRect.width - controller.offsetWidth - 10)),
-        top: Math.max(10, Math.min(pos.top, maxY))
+        left: Math.max(MIN_MARGIN, Math.min(pos.left, rect.width - controller.offsetWidth - MIN_MARGIN)),
+        top: Math.max(MIN_MARGIN, Math.min(pos.top, rect.height - CONTROL_HEIGHT - controller.offsetHeight))
       };
     };
 
-    const updateControlsPosition = (controller, video) => {
+    const updateControlsPosition = () => {
       const videoRect = video.getBoundingClientRect();
       const controllerRect = controller.getBoundingClientRect();
-      const margin = 50; // minimum distance from edge to trigger repositioning
 
-      // Clear existing position
       controller.removeAttribute('data-position');
 
-      // Check edges and set appropriate position
-      if (controllerRect.right + margin >= videoRect.right) {
+      if (controllerRect.right + EDGE_MARGIN >= videoRect.right) {
         controller.setAttribute('data-position', 'right');
-      } else if (controllerRect.left <= videoRect.left + margin) {
+      } else if (controllerRect.left <= videoRect.left + EDGE_MARGIN) {
         controller.setAttribute('data-position', 'left');
-      } else if (controllerRect.bottom + margin >= videoRect.bottom) {
+      } else if (controllerRect.bottom + EDGE_MARGIN >= videoRect.bottom) {
         controller.setAttribute('data-position', 'bottom');
-      } else if (controllerRect.top <= videoRect.top + margin) {
+      } else if (controllerRect.top <= videoRect.top + EDGE_MARGIN) {
         controller.setAttribute('data-position', 'top');
       }
     };
 
     const positionController = () => {
-      const videoRect = video.getBoundingClientRect();
-      let position;
-
-      // Get saved position from the WeakMap
       const savedPosition = controllerPositions.get(video);
-
-      if (savedPosition) {
-        position = getSafePosition(savedPosition);
-      } else {
-        position = { left: 10, top: 10 };
-      }
-
+      let position = savedPosition ? getSafePosition(savedPosition) : { left: 10, top: 10 };
+      
       controller.style.left = `${position.left}px`;
       controller.style.top = `${position.top}px`;
-
-      // Update controls position
-      updateControlsPosition(controller, video);
+      updateControlsPosition();
     };
 
-    // Add this variable at the start of createController
-    let isDragging = false;
-
-    // Modify the startDrag function
+    // Drag handling
     const startDrag = (e) => {
       if (e.target.classList.contains('vsc-btn')) return;
       e.preventDefault();
@@ -151,34 +164,28 @@
       e.preventDefault();
       e.stopPropagation();
       
-      const videoRect = video.getBoundingClientRect();
-      const controlHeight = 40;
-      
-      // Calculate new position
-      let newX = e.clientX - state.dragState.offsetX - videoRect.left;
-      let newY = e.clientY - state.dragState.offsetY - videoRect.top;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const rect = video.getBoundingClientRect();
+        let newX = e.clientX - state.dragState.offsetX - rect.left;
+        let newY = e.clientY - state.dragState.offsetY - rect.top;
 
-      // Get safe boundaries
-      const maxY = videoRect.height - controlHeight - controller.offsetHeight;
-      const maxX = videoRect.width - controller.offsetWidth - 10;
+        const maxY = rect.height - CONTROL_HEIGHT - controller.offsetHeight;
+        const maxX = rect.width - controller.offsetWidth - MIN_MARGIN;
 
-      // Constrain to safe area
-      newX = Math.max(10, Math.min(newX, maxX));
-      newY = Math.max(10, Math.min(newY, maxY));
+        newX = Math.max(MIN_MARGIN, Math.min(newX, maxX));
+        newY = Math.max(MIN_MARGIN, Math.min(newY, maxY));
 
-      // Additional check for control areas
-      if (isInControlArea(video, e.clientX, e.clientY)) {
-        newY = parseFloat(controller.style.top) || 10;
-      }
+        if (isInControlArea(video, e.clientX, e.clientY)) {
+          newY = parseFloat(controller.style.top) || MIN_MARGIN;
+        }
 
-      controller.style.left = `${newX}px`;
-      controller.style.top = `${newY}px`;
-
-      // Update controls position
-      updateControlsPosition(controller, video);
+        controller.style.left = `${newX}px`;
+        controller.style.top = `${newY}px`;
+        updateControlsPosition();
+      });
     };
 
-    // Modify the stopDrag function
     const stopDrag = (e) => {
       if (!state.dragState.isDragging) return;
       e.preventDefault();
@@ -187,61 +194,57 @@
       state.dragState.isDragging = false;
       controller.classList.remove('grabbing');
       
-      // Save position relative to video
-      const videoRect = video.getBoundingClientRect();
       const position = {
         left: parseFloat(controller.style.left),
         top: parseFloat(controller.style.top)
       };
       
-      // Ensure saved position is safe
       const safePosition = getSafePosition(position);
       controllerPositions.set(video, safePosition);
       
-      // Update to safe position if needed
       if (safePosition.top !== position.top || safePosition.left !== position.left) {
         controller.style.left = `${safePosition.left}px`;
         controller.style.top = `${safePosition.top}px`;
       }
 
-      // Prevent the click event from firing after drag
-      setTimeout(() => {
-        isDragging = false;
-      }, 0);
+      setTimeout(() => isDragging = false, 0);
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
     };
 
     // Event listeners
-    const handleMouseDown = e => {
+    controller.addEventListener('mousedown', e => {
       e.stopPropagation();
       e.preventDefault();
       startDrag(e);
-    };
+    });
 
-    const handleMouseMove = e => {
+    document.addEventListener('mousemove', e => {
       if (state.dragState.isDragging) {
         e.stopPropagation();
         e.preventDefault();
         handleDrag(e);
       }
-    };
+    });
 
-    const handleMouseUp = e => {
+    document.addEventListener('mouseup', e => {
       if (state.dragState.isDragging) {
         e.stopPropagation();
         e.preventDefault();
         e.stopImmediatePropagation();
         stopDrag(e);
       }
-    };
+    });
 
-    controller.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    // Speed control handlers with event prevention
+    // Speed control handlers
     const handleSpeedChange = (delta) => {
-      video.playbackRate = Math.max(0.1, 
-        Math.min(16, video.playbackRate + delta));
+      video.playbackRate = Math.max(0.1, Math.min(16, video.playbackRate + delta));
+      if (state.settings.rememberSpeed) {
+        state.lastSpeed = video.playbackRate;
+        chrome.storage.sync.set({ lastSpeed: video.playbackRate });
+      }
       updateDisplay();
     };
 
@@ -265,31 +268,36 @@
       e.stopPropagation();
       e.preventDefault();
       if (!state.dragState.isDragging) {
-        video.playbackRate = 1;
+        video.playbackRate = state.settings.resetSpeed;
+        if (state.settings.rememberSpeed) {
+          state.lastSpeed = video.playbackRate;
+          chrome.storage.sync.set({ lastSpeed: video.playbackRate });
+        }
         updateDisplay();
       }
     });
 
-    // Update display
+    let updateTimeout = null;
     const updateDisplay = () => {
-      if (video && document.contains(video)) {
-        const speed = video.playbackRate;
-        controller.querySelector('.vsc-display').textContent = 
-          `${speed.toFixed(2)}×`;
-      }
+      if (updateTimeout) return;
+      updateTimeout = setTimeout(() => {
+        if (video && document.contains(video)) {
+          display.textContent = `${video.playbackRate.toFixed(2)}×`;
+        }
+        updateTimeout = null;
+      }, 16);
     };
 
-    // Video event listeners for speed sync
-    video.addEventListener('play', updateDisplay);
-    video.addEventListener('loadeddata', updateDisplay);
-    video.addEventListener('ratechange', updateDisplay);
-    video.addEventListener('seeking', updateDisplay);
+    // Video event listeners
+    ['play', 'loadeddata', 'ratechange', 'seeking'].forEach(event => {
+      video.addEventListener(event, updateDisplay);
+    });
 
     // Initialize
     video.parentElement.appendChild(controller);
     videoControllers.set(video, controller);
     positionController();
-    updateDisplay(); // Initial display update
+    updateDisplay();
 
     // Observers
     const resizeObserver = new ResizeObserver(() => {
@@ -301,17 +309,14 @@
         const safePosition = getSafePosition(currentPosition);
         controller.style.left = `${safePosition.left}px`;
         controller.style.top = `${safePosition.top}px`;
+        updateControlsPosition();
       }
     });
     resizeObserver.observe(video);
 
     const mutationObserver = new MutationObserver(() => {
       if (!document.contains(video)) {
-        controller.remove();
-        videoControllers.delete(video);
-        controllerPositions.delete(video);
-        resizeObserver.disconnect();
-        mutationObserver.disconnect();
+        cleanup();
       }
     });
 
@@ -320,7 +325,7 @@
       subtree: true
     });
 
-    // Add click prevention to the controller
+    // Click prevention
     controller.addEventListener('click', (e) => {
       if (isDragging) {
         e.preventDefault();
@@ -331,62 +336,111 @@
 
     // Cleanup
     const cleanup = () => {
-      controller.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      video.removeEventListener('play', updateDisplay);
-      video.removeEventListener('loadeddata', updateDisplay);
-      video.removeEventListener('ratechange', updateDisplay);
-      video.removeEventListener('seeking', updateDisplay);
+      if (rafId) cancelAnimationFrame(rafId);
+      if (updateTimeout) clearTimeout(updateTimeout);
+      controller.removeEventListener('mousedown', startDrag);
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', stopDrag);
+      ['play', 'loadeddata', 'ratechange', 'seeking'].forEach(event => {
+        video.removeEventListener(event, updateDisplay);
+      });
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      controller.remove();
+      videoControllers.delete(video);
+      controllerPositions.delete(video);
     };
 
     return cleanup;
   };
 
-  // Track videos and ensure displays are updated
+  // Track videos
   const trackVideos = () => {
-    document.querySelectorAll('video').forEach(video => {
-      if (!videoControllers.has(video) && video.offsetWidth > 50) {
-        const cleanup = createController(video);
-        if (!state.activeVideo) state.activeVideo = video;
-        
-        // Cleanup when video is removed
-        new MutationObserver(() => {
-          if (!document.contains(video)) {
-            cleanup();
+    if (isDisabledSite()) return;
+
+    requestAnimationFrame(() => {
+      document.querySelectorAll('video').forEach(video => {
+        // Set speed immediately when video is found, before controller creation
+        if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
+          video.playbackRate = state.lastSpeed;
+        }
+
+        if (!videoControllers.has(video) && video.offsetWidth > 50) {
+          const cleanup = createController(video);
+          if (!state.activeVideo) {
+            state.activeVideo = video;
           }
-        }).observe(document.body, { childList: true, subtree: true });
-      }
+
+          // Watch for video loading
+          const handleLoad = () => {
+            if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
+              video.playbackRate = state.lastSpeed;
+            }
+          };
+
+          // Add load event listeners
+          video.addEventListener('loadeddata', handleLoad);
+          video.addEventListener('loadedmetadata', handleLoad);
+          video.addEventListener('canplay', handleLoad);
+          
+          new MutationObserver(() => {
+            if (!document.contains(video)) {
+              video.removeEventListener('loadeddata', handleLoad);
+              video.removeEventListener('loadedmetadata', handleLoad);
+              video.removeEventListener('canplay', handleLoad);
+              cleanup();
+            }
+          }).observe(document.body, { childList: true, subtree: true });
+        }
+      });
     });
   };
 
+  // Also add a global video event listener
+  document.addEventListener('play', (e) => {
+    if (e.target instanceof HTMLVideoElement && state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
+      // Small delay to ensure it overrides any default speed settings
+      setTimeout(() => {
+        e.target.playbackRate = state.lastSpeed;
+      }, 0);
+    }
+  }, true);
+
   // Keyboard handler
   const handleKey = (e) => {
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+    if (isDisabledSite() || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
 
+    const key = e.key.toLowerCase();
     const actions = {
-      's': () => adjustSpeed(-state.settings.step),
-      'd': () => adjustSpeed(state.settings.step),
-      'r': () => resetSpeed(),
-      'z': () => rewind(),
-      'x': () => advance()
+      [state.settings.keys.slow]: () => adjustSpeed(-state.settings.step),
+      [state.settings.keys.fast]: () => adjustSpeed(state.settings.step),
+      [state.settings.keys.reset]: () => resetSpeed(),
+      [state.settings.keys.rewind]: () => rewind(),
+      [state.settings.keys.advance]: () => advance()
     };
 
-    if (actions[e.key.toLowerCase()]) {
+    if (actions[key]) {
       e.preventDefault();
-      actions[e.key.toLowerCase()]();
+      actions[key]();
     }
   };
 
   const adjustSpeed = (delta) => {
     if (!state.activeVideo) return;
-    state.activeVideo.playbackRate = Math.max(0.1, 
-      Math.min(16, state.activeVideo.playbackRate + delta));
+    state.activeVideo.playbackRate = Math.max(0.1, Math.min(16, state.activeVideo.playbackRate + delta));
+    if (state.settings.rememberSpeed) {
+      state.lastSpeed = state.activeVideo.playbackRate;
+      chrome.storage.sync.set({ lastSpeed: state.activeVideo.playbackRate });
+    }
   };
 
   const resetSpeed = () => {
     if (state.activeVideo) {
-      state.activeVideo.playbackRate = 1;
+      state.activeVideo.playbackRate = state.settings.resetSpeed;
+      if (state.settings.rememberSpeed) {
+        state.lastSpeed = state.activeVideo.playbackRate;
+        chrome.storage.sync.set({ lastSpeed: state.activeVideo.playbackRate });
+      }
     }
   };
 
@@ -398,25 +452,114 @@
 
   const advance = () => {
     if (state.activeVideo) {
-      state.activeVideo.currentTime += state.settings.rewind;
+      state.activeVideo.currentTime += state.settings.advance;
     }
   };
 
-  // Initialization
-  chrome.storage.sync.get(null, settings => {
-    Object.assign(state.settings, settings);
-    trackVideos();
-    
-    new MutationObserver(trackVideos).observe(document, {
-      childList: true,
-      subtree: true
-    });
-
-    document.addEventListener('keydown', handleKey);
-    window.addEventListener('resize', trackVideos);
+  // Settings update handler
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'settingsUpdated') {
+      const wasRememberSpeed = state.settings.rememberSpeed;
+      const previousDisabledSites = [...state.settings.disabledSites];
+      const wasDisabled = previousDisabledSites.some(site => {
+        const hostname = window.location.hostname.replace('www.', '');
+        return hostname === site || hostname.endsWith('.' + site);
+      });
+      
+      // Update settings
+      Object.assign(state.settings, message.settings);
+      const isNowDisabled = isDisabledSite();
+      
+      // Handle site status changes
+      if (isNowDisabled && !wasDisabled) {
+        // Site was just disabled - remove all controllers
+        document.querySelectorAll('video').forEach(video => {
+          const controller = videoControllers.get(video);
+          if (controller) {
+            // Reset speed to default if needed
+            if (wasRememberSpeed) {
+              video.playbackRate = 1.0;
+            }
+            // Clean up and remove controller
+            controller.remove();
+            videoControllers.delete(video);
+            controllerPositions.delete(video);
+          }
+        });
+      } else if (!isNowDisabled && wasDisabled) {
+        // Site was just enabled - add controllers to all videos
+        document.querySelectorAll('video').forEach(video => {
+          if (!videoControllers.has(video) && video.offsetWidth > 50) {
+            // Set speed before creating controller
+            if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
+              video.playbackRate = state.lastSpeed;
+            } else {
+              video.playbackRate = state.settings.defaultSpeed;
+            }
+            createController(video);
+          }
+        });
+      } else if (!isNowDisabled) {
+        // Site remains enabled - update existing controllers
+        document.querySelectorAll('video').forEach(video => {
+          const controller = videoControllers.get(video);
+          if (controller) {
+            controller.style.opacity = state.settings.opacity;
+            controller.style.display = state.settings.hideController ? 'none' : 'block';
+            
+            // Handle speed changes based on remember speed setting
+            if (state.settings.rememberSpeed && !wasRememberSpeed) {
+              state.lastSpeed = video.playbackRate;
+              chrome.storage.sync.set({ lastSpeed: video.playbackRate });
+            } else if (!state.settings.rememberSpeed) {
+              video.playbackRate = state.settings.defaultSpeed;
+            }
+          } else if (video.offsetWidth > 50) {
+            // Create controller for any videos that don't have one
+            createController(video);
+          }
+        });
+      }
+    }
   });
 
-  chrome.storage.onChanged.addListener(changes => {
-    Object.assign(state.settings, changes);
+  // Initialize
+  chrome.storage.sync.get({ ...state.settings, lastSpeed: 1.0 }, items => {
+    // Extract lastSpeed from items and store the rest in settings
+    const { lastSpeed, ...settings } = items;
+    Object.assign(state.settings, settings);
+    state.lastSpeed = lastSpeed;
+
+    if (!isDisabledSite()) {
+      // Set speed for any existing videos immediately
+      document.querySelectorAll('video').forEach(video => {
+        if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
+          video.playbackRate = state.lastSpeed;
+        }
+      });
+
+      // Set up a global rate change listener
+      document.addEventListener('ratechange', (e) => {
+        if (state.settings.rememberSpeed && e.target instanceof HTMLVideoElement) {
+          state.lastSpeed = e.target.playbackRate;
+          chrome.storage.sync.set({ lastSpeed: e.target.playbackRate });
+
+          // Also update any other videos on the page
+          document.querySelectorAll('video').forEach(video => {
+            if (video !== e.target && state.settings.rememberSpeed) {
+              video.playbackRate = state.lastSpeed;
+            }
+          });
+        }
+      }, true);
+
+      trackVideos();
+      
+      const observer = new MutationObserver(trackVideos);
+      observer.observe(document, { childList: true, subtree: true });
+
+      document.addEventListener('keydown', handleKey);
+      window.addEventListener('resize', () => requestAnimationFrame(trackVideos));
+    }
   });
 })();
