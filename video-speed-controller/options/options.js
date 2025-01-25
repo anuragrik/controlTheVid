@@ -136,21 +136,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       };
 
-      // Save settings to storage
+      // Save settings to storage - this will trigger the onChanged event in content scripts
       await new Promise(resolve => chrome.storage.sync.set(settings, resolve));
-
-      // Notify all tabs about the settings update
-      const tabs = await new Promise(resolve => chrome.tabs.query({}, resolve));
-      await Promise.all(tabs.map(tab => 
-        new Promise(resolve => {
-          chrome.tabs.sendMessage(tab.id, {
-            type: 'settingsUpdated',
-            settings: settings
-          }).then(() => resolve())
-            .catch(() => resolve()); // Ignore errors for tabs that don't have the content script
-        })
-      ));
-
       showStatus('Settings saved successfully');
 
       // Update form with normalized values
@@ -166,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Error saving settings:', error);
       showStatus('Error saving settings', true);
     }
-  }, 100); // Reduced debounce time for faster response
+  }, 50); // Reduced debounce time for faster response
 
   // Optimize event listeners
   elements.save.addEventListener('click', saveSettings, { passive: true });

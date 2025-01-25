@@ -117,11 +117,24 @@
     }
 
     // Set initial video speed
-    if (state.settings.rememberSpeed) {
-      video.playbackRate = state.lastSpeed;
-    } else {
-      video.playbackRate = state.settings.defaultSpeed;
-    }
+    const setInitialSpeed = () => {
+      if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
+        video.playbackRate = state.lastSpeed;
+      } else {
+        video.playbackRate = state.settings.defaultSpeed;
+      }
+    };
+
+    // Try setting speed multiple times to overcome site-specific scripts
+    setInitialSpeed();
+    setTimeout(setInitialSpeed, 0);
+    setTimeout(setInitialSpeed, 100);
+
+    // Add event listeners for video loading states
+    const loadEvents = ['loadeddata', 'loadedmetadata', 'canplay', 'playing'];
+    loadEvents.forEach(event => {
+      video.addEventListener(event, setInitialSpeed, { passive: true });
+    });
 
     // Optimize rate change handling
     const handleRateChange = throttle(() => {
@@ -129,6 +142,7 @@
         state.lastSpeed = video.playbackRate;
         chrome.storage.sync.set({ lastSpeed: video.playbackRate });
       }
+      updateDisplay();
     }, 100);
 
     video.addEventListener('ratechange', handleRateChange);
@@ -538,91 +552,6 @@
     });
   };
 
-  // Settings update handler
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'settingsUpdated') {
-      const wasRememberSpeed = state.settings.rememberSpeed;
-      const previousDisabledSites = [...state.settings.disabledSites];
-      const wasDisabled = previousDisabledSites.some(site => {
-        const hostname = window.location.hostname.replace('www.', '');
-        return hostname === site || hostname.endsWith('.' + site);
-      });
-      
-      // Store current video states before updating settings
-      const videoStates = new Map();
-      document.querySelectorAll('video').forEach(video => {
-        videoStates.set(video, {
-          speed: video.playbackRate,
-          controller: videoControllers.get(video)
-        });
-      });
-      
-      // Update settings
-      Object.assign(state.settings, message.settings);
-      const isNowDisabled = isDisabledSite();
-      
-      // Handle site status changes
-      if (isNowDisabled && !wasDisabled) {
-        // Site was just disabled - remove all controllers and reset speeds
-        document.querySelectorAll('video').forEach(video => {
-          const controller = videoControllers.get(video);
-          if (controller) {
-            // Reset speed to default
-            video.playbackRate = 1.0;
-            // Clean up and remove controller
-            controller.remove();
-            videoControllers.delete(video);
-            controllerPositions.delete(video);
-            videoStates.delete(video);
-            if (rafCallbacks.has(video)) {
-              cancelAnimationFrame(rafCallbacks.get(video));
-              rafCallbacks.delete(video);
-            }
-          }
-        });
-        // Remove event listeners if site is disabled
-        document.removeEventListener('keydown', handleKey);
-        window.removeEventListener('resize', () => requestAnimationFrame(trackVideos));
-      } else if (!isNowDisabled && wasDisabled) {
-        // Site was just enabled - add controllers to all videos
-        document.querySelectorAll('video').forEach(video => {
-          if (!videoControllers.has(video) && video.offsetWidth > 50) {
-            createController(video);
-          }
-        });
-        // Re-add event listeners if site is enabled
-        document.addEventListener('keydown', handleKey);
-        window.addEventListener('resize', () => requestAnimationFrame(trackVideos));
-      } else if (!isNowDisabled) {
-        // Site remains enabled - update existing controllers
-        document.querySelectorAll('video').forEach(video => {
-          const controller = videoControllers.get(video);
-          const previousState = videoStates.get(video);
-          
-          if (controller) {
-            // Update visual properties
-            controller.style.opacity = state.settings.opacity;
-            controller.style.display = state.settings.hideController ? 'none' : 'block';
-            
-            // Keep current speed unless remember speed setting changed
-            if (state.settings.rememberSpeed && !wasRememberSpeed) {
-              state.lastSpeed = video.playbackRate;
-              chrome.storage.sync.set({ lastSpeed: video.playbackRate });
-            }
-          } else if (video.offsetWidth > 50) {
-            // Create controller for any videos that don't have one
-            createController(video);
-          }
-        });
-      }
-      
-      // Send response to confirm settings were updated
-      sendResponse({ success: true });
-    }
-    // Return true to indicate we'll send a response asynchronously
-    return true;
-  });
-
   // Initialize
   chrome.storage.sync.get({ ...state.settings, lastSpeed: 1.0 }, items => {
     // Extract lastSpeed from items and store the rest in settings
@@ -630,34 +559,31 @@
     Object.assign(state.settings, settings);
     state.lastSpeed = lastSpeed;
 
-    // Listen for storage changes
+    // Single source of truth for settings updates
     chrome.storage.onChanged.addListener((changes, namespace) => {
       if (namespace === 'sync') {
-        const wasRememberSpeed = state.settings.rememberSpeed;
-        const previousDisabledSites = [...state.settings.disabledSites];
-        const wasDisabled = previousDisabledSites.some(site => {
-          const hostname = window.location.hostname.replace('www.', '');
-          return hostname === site || hostname.endsWith('.' + site);
-        });
-
-        // Update settings from changes
+        // Update settings first
         Object.keys(changes).forEach(key => {
           if (key === 'lastSpeed') {
             state.lastSpeed = changes[key].newValue;
           } else if (key === 'keys') {
             state.settings.keys = changes[key].newValue;
           } else if (key === 'disabledSites') {
-            state.settings.disabledSites = changes[key].newValue;
+            state.settings.disabledSites = Array.isArray(changes[key].newValue) ? changes[key].newValue : [];
           } else {
             state.settings[key] = changes[key].newValue;
           }
         });
 
-        const isNowDisabled = isDisabledSite();
+        // Check disabled status after settings are updated
+        const hostname = window.location.hostname.replace('www.', '');
+        const isNowDisabled = state.settings.disabledSites.some(site => 
+          hostname === site || hostname.endsWith('.' + site)
+        );
         
-        // Handle site status changes
-        if (isNowDisabled && !wasDisabled) {
-          // Site was just disabled - remove all controllers and reset speeds
+        // Handle site status changes immediately
+        if (isNowDisabled) {
+          // Site is disabled - remove all controllers and reset speeds
           document.querySelectorAll('video').forEach(video => {
             const controller = videoControllers.get(video);
             if (controller) {
@@ -677,35 +603,46 @@
           // Remove event listeners if site is disabled
           document.removeEventListener('keydown', handleKey);
           window.removeEventListener('resize', () => requestAnimationFrame(trackVideos));
-        } else if (!isNowDisabled && wasDisabled) {
-          // Site was just enabled - add controllers to all videos
-          document.querySelectorAll('video').forEach(video => {
-            if (!videoControllers.has(video) && video.offsetWidth > 50) {
-              createController(video);
-            }
-          });
-          // Re-add event listeners if site is enabled
-          document.addEventListener('keydown', handleKey);
-          window.addEventListener('resize', () => requestAnimationFrame(trackVideos));
-        } else if (!isNowDisabled) {
-          // Site remains enabled - update existing controllers
+        } else {
+          // Site is enabled - add controllers to all videos
           document.querySelectorAll('video').forEach(video => {
             const controller = videoControllers.get(video);
-            if (controller) {
-              // Update visual properties
-              controller.style.opacity = state.settings.opacity;
-              controller.style.display = state.settings.hideController ? 'none' : 'block';
-              
-              // Keep current speed unless remember speed setting changed
-              if (state.settings.rememberSpeed && !wasRememberSpeed) {
-                state.lastSpeed = video.playbackRate;
-                chrome.storage.sync.set({ lastSpeed: video.playbackRate });
-              }
-            } else if (video.offsetWidth > 50) {
-              // Create controller for any videos that don't have one
+            
+            if (!controller && video.offsetWidth > 50) {
               createController(video);
+            } else if (controller) {
+              // Update existing controller properties
+              if (changes.opacity) {
+                controller.style.opacity = changes.opacity.newValue;
+              }
+              if (changes.hideController) {
+                controller.style.display = changes.hideController.newValue ? 'none' : 'block';
+              }
+              
+              // Handle speed-related changes
+              if (changes.defaultSpeed && !state.settings.rememberSpeed) {
+                video.playbackRate = changes.defaultSpeed.newValue;
+              }
+              if (changes.resetSpeed && video.playbackRate === changes.resetSpeed.oldValue) {
+                video.playbackRate = changes.resetSpeed.newValue;
+              }
+              if (changes.rememberSpeed) {
+                if (changes.rememberSpeed.newValue) {
+                  video.playbackRate = state.lastSpeed;
+                } else {
+                  video.playbackRate = state.settings.defaultSpeed;
+                }
+              }
             }
           });
+          
+          // Ensure event listeners are added
+          if (!document.onkeydown) {
+            document.addEventListener('keydown', handleKey);
+          }
+          if (!window.onresize) {
+            window.addEventListener('resize', () => requestAnimationFrame(trackVideos));
+          }
         }
       }
     });
