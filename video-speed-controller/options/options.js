@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Cache DOM elements
   const elements = {
     step: document.getElementById('step'),
     rewind: document.getElementById('rewind'),
@@ -39,58 +40,78 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Show status message
-  const showStatus = (message, isError = false) => {
-    elements.status.textContent = message;
-    elements.status.style.display = 'block';
-    elements.status.style.background = isError ? '#fee2e2' : '#dcfce7';
-    elements.status.style.color = isError ? '#991b1b' : '#166534';
-    elements.status.classList.remove('fade-out');
-    
-    // Clear any existing timeout
-    if (elements.status._timeout) {
-      clearTimeout(elements.status._timeout);
-    }
-
-    // Set new timeout for hiding
-    elements.status._timeout = setTimeout(() => {
-      elements.status.classList.add('fade-out');
-      setTimeout(() => {
-        elements.status.style.display = 'none';
-        elements.status.classList.remove('fade-out');
-      }, 300); // Match animation duration
-    }, 2000);
+  // Debounce function for performance optimization
+  const debounce = (func, wait) => {
+    let timeout;
+    return function(...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
   };
 
-  // Load settings
-  chrome.storage.sync.get(defaultSettings, (items) => {
+  // Show status message with optimized animation handling
+  const showStatus = (() => {
+    let currentTimeout;
+    return (message, isError = false) => {
+      if (currentTimeout) {
+        clearTimeout(currentTimeout);
+        elements.status.classList.remove('fade-out');
+      }
+
+      requestAnimationFrame(() => {
+        elements.status.textContent = message;
+        elements.status.style.display = 'block';
+        elements.status.style.background = isError ? '#fee2e2' : '#dcfce7';
+        elements.status.style.color = isError ? '#991b1b' : '#166534';
+        
+        currentTimeout = setTimeout(() => {
+          elements.status.classList.add('fade-out');
+          setTimeout(() => {
+            if (elements.status.classList.contains('fade-out')) {
+              elements.status.style.display = 'none';
+              elements.status.classList.remove('fade-out');
+            }
+          }, 300);
+        }, 2000);
+      });
+    };
+  })();
+
+  // Load settings with optimized error handling
+  const loadSettings = async () => {
     try {
+      const items = await new Promise(resolve => 
+        chrome.storage.sync.get(defaultSettings, resolve)
+      );
+      
       const settings = { ...defaultSettings, ...items };
       
-      // Update form with loaded settings
-      elements.step.value = settings.step;
-      elements.rewind.value = settings.rewind;
-      elements.advance.value = settings.advance;
-      elements.opacity.value = settings.opacity;
-      elements.defaultSpeed.value = settings.defaultSpeed;
-      elements.resetSpeed.value = settings.resetSpeed;
-      elements.hideController.checked = settings.hideController;
-      elements.rememberSpeed.checked = settings.rememberSpeed;
-      elements.disabledSites.value = (settings.disabledSites || []).join('\n');
-      elements.keySlow.value = settings.keys?.slow || 's';
-      elements.keyFast.value = settings.keys?.fast || 'd';
-      elements.keyReset.value = settings.keys?.reset || 'r';
-      elements.keyRewind.value = settings.keys?.rewind || 'z';
-      elements.keyAdvance.value = settings.keys?.advance || 'x';
-      elements.keyToggle.value = settings.keys?.toggle || 'v';
+      // Batch DOM updates
+      requestAnimationFrame(() => {
+        elements.step.value = settings.step;
+        elements.rewind.value = settings.rewind;
+        elements.advance.value = settings.advance;
+        elements.opacity.value = settings.opacity;
+        elements.defaultSpeed.value = settings.defaultSpeed;
+        elements.resetSpeed.value = settings.resetSpeed;
+        elements.hideController.checked = settings.hideController;
+        elements.rememberSpeed.checked = settings.rememberSpeed;
+        elements.disabledSites.value = (settings.disabledSites || []).join('\n');
+        elements.keySlow.value = settings.keys?.slow || 's';
+        elements.keyFast.value = settings.keys?.fast || 'd';
+        elements.keyReset.value = settings.keys?.reset || 'r';
+        elements.keyRewind.value = settings.keys?.rewind || 'z';
+        elements.keyAdvance.value = settings.keys?.advance || 'x';
+        elements.keyToggle.value = settings.keys?.toggle || 'v';
+      });
     } catch (error) {
       console.error('Error loading settings:', error);
       showStatus('Error loading settings', true);
     }
-  });
+  };
 
-  // Save settings
-  const saveSettings = () => {
+  // Save settings with optimized validation and storage
+  const saveSettings = debounce(async () => {
     try {
       const settings = {
         step: Math.max(0.1, Math.min(2, parseFloat(elements.step.value) || 0.1)),
@@ -115,48 +136,60 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       };
 
-      console.log('Saving settings:', settings);
+      // Save settings to storage
+      await new Promise(resolve => chrome.storage.sync.set(settings, resolve));
 
-      chrome.storage.sync.set(settings, () => {
-        if (chrome.runtime.lastError) {
-          console.error('Error saving settings:', chrome.runtime.lastError);
-          showStatus('Error saving settings', true);
-          return;
-        }
+      // Notify all tabs about the settings update
+      const tabs = await new Promise(resolve => chrome.tabs.query({}, resolve));
+      await Promise.all(tabs.map(tab => 
+        new Promise(resolve => {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'settingsUpdated',
+            settings: settings
+          }).then(() => resolve())
+            .catch(() => resolve()); // Ignore errors for tabs that don't have the content script
+        })
+      ));
 
-        showStatus('Settings saved!');
+      showStatus('Settings saved successfully');
 
-        // Notify content script of changes
-        chrome.tabs.query({}, tabs => {
-          tabs.forEach(tab => {
-            chrome.tabs.sendMessage(tab.id, { type: 'settingsUpdated', settings });
-          });
-        });
+      // Update form with normalized values
+      requestAnimationFrame(() => {
+        elements.step.value = settings.step;
+        elements.rewind.value = settings.rewind;
+        elements.advance.value = settings.advance;
+        elements.opacity.value = settings.opacity;
+        elements.defaultSpeed.value = settings.defaultSpeed;
+        elements.resetSpeed.value = settings.resetSpeed;
       });
     } catch (error) {
       console.error('Error saving settings:', error);
       showStatus('Error saving settings', true);
     }
-  };
+  }, 100); // Reduced debounce time for faster response
 
-  // Add save button click handler
-  elements.save.addEventListener('click', saveSettings);
+  // Optimize event listeners
+  elements.save.addEventListener('click', saveSettings, { passive: true });
 
-  // Add keyboard shortcut for saving (Ctrl/Cmd + S)
-  document.addEventListener('keydown', e => {
+  // Optimize keyboard shortcut handling
+  const handleKeyboardSave = (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
       e.preventDefault();
       saveSettings();
     }
-  });
+  };
+  document.addEventListener('keydown', handleKeyboardSave);
 
-  // Key input handling
-  const keyInputs = document.querySelectorAll('.key-input');
-  const handleKeyDown = e => {
-    if (e.key.length === 1) {
-      e.target.value = e.key.toLowerCase();
+  // Optimize key input handling with event delegation
+  const handleKeyInput = (e) => {
+    const target = e.target;
+    if (target.classList.contains('key-input') && e.key.length === 1) {
       e.preventDefault();
+      target.value = e.key.toLowerCase();
     }
   };
-  keyInputs.forEach(input => input.addEventListener('keydown', handleKeyDown));
+  document.addEventListener('keydown', handleKeyInput, { passive: false });
+
+  // Initialize settings
+  loadSettings();
 });

@@ -1,6 +1,8 @@
 (() => {
   const videoControllers = new WeakMap();
   const controllerPositions = new WeakMap();
+  const videoStates = new WeakMap();
+  const rafCallbacks = new WeakMap();
   const state = {
     settings: {
       step: 0.1,
@@ -45,6 +47,27 @@
   const isYouTube = window.location.hostname.includes('youtube.com');
   const isVimeo = window.location.hostname.includes('vimeo.com');
 
+  // Throttle function for performance optimization
+  const throttle = (func, limit) => {
+    let inThrottle;
+    return function(...args) {
+      if (!inThrottle) {
+        func.apply(this, args);
+        inThrottle = true;
+        setTimeout(() => inThrottle = false, limit);
+      }
+    };
+  };
+
+  // Debounce function for performance optimization
+  const debounce = (func, wait) => {
+    let timeout;
+    return function(...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  };
+
   const isInControlArea = (video, x, y) => {
     const rect = video.getBoundingClientRect();
     if (y > rect.bottom - CONTROL_HEIGHT) return true;
@@ -58,13 +81,37 @@
   const createController = (video) => {
     if (videoControllers.has(video) || isDisabledSite()) return;
 
+    // Create elements once and cache them
     const controller = document.createElement('div');
-    controller.className = 'vsc-controller';
-    
-    // Apply opacity from settings
-    controller.style.opacity = state.settings.opacity;
+    const hoverContainer = document.createElement('div');
+    const display = document.createElement('div');
+    const controls = document.createElement('div');
+    const slowerBtn = document.createElement('button');
+    const resetBtn = document.createElement('button');
+    const fasterBtn = document.createElement('button');
 
-    // Hide controller if setting is enabled
+    // Set up classes and attributes
+    controller.className = 'vsc-controller';
+    hoverContainer.className = 'vsc-hover-container';
+    display.className = 'vsc-display';
+    controls.className = 'vsc-controls';
+    slowerBtn.className = 'vsc-btn vsc-slower';
+    resetBtn.className = 'vsc-btn vsc-reset';
+    fasterBtn.className = 'vsc-btn vsc-faster';
+
+    // Set text content
+    slowerBtn.textContent = '−';
+    resetBtn.textContent = '⭮';
+    fasterBtn.textContent = '+';
+    display.textContent = `${video.playbackRate.toFixed(2)}×`;
+
+    // Build DOM structure
+    controls.append(slowerBtn, resetBtn, fasterBtn);
+    hoverContainer.append(display, controls);
+    controller.appendChild(hoverContainer);
+
+    // Apply settings
+    controller.style.opacity = state.settings.opacity;
     if (state.settings.hideController) {
       controller.style.display = 'none';
     }
@@ -76,39 +123,21 @@
       video.playbackRate = state.settings.defaultSpeed;
     }
 
-    // Update lastSpeed when video rate changes
-    const handleRateChange = () => {
+    // Optimize rate change handling
+    const handleRateChange = throttle(() => {
       if (state.settings.rememberSpeed) {
         state.lastSpeed = video.playbackRate;
         chrome.storage.sync.set({ lastSpeed: video.playbackRate });
       }
-    };
+    }, 100);
+
     video.addEventListener('ratechange', handleRateChange);
 
+    // Prevent event bubbling
     controller.addEventListener('dblclick', e => {
       e.stopPropagation();
       e.preventDefault();
-    });
-
-    const hoverContainer = document.createElement('div');
-    hoverContainer.className = 'vsc-hover-container';
-
-    controller.innerHTML = `
-      <div class="vsc-display">${video.playbackRate.toFixed(2)}×</div>
-      <div class="vsc-controls">
-        <button class="vsc-btn vsc-slower">−</button>
-        <button class="vsc-btn vsc-reset">⭮</button>
-        <button class="vsc-btn vsc-faster">+</button>
-      </div>
-    `;
-
-    // Move the controls into the hover container
-    const display = controller.querySelector('.vsc-display');
-    const controls = controller.querySelector('.vsc-controls');
-    controller.innerHTML = '';
-    hoverContainer.appendChild(display);
-    hoverContainer.appendChild(controls);
-    controller.appendChild(hoverContainer);
+    }, { passive: true });
 
     let isDragging = false;
     let rafId = null;
@@ -160,13 +189,13 @@
       controller.classList.add('grabbing');
     };
 
+    // Optimize drag handling
     const handleDrag = (e) => {
       if (!state.dragState.isDragging) return;
       e.preventDefault();
       e.stopPropagation();
       
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
+      const rafCallback = () => {
         const rect = video.getBoundingClientRect();
         let newX = e.clientX - state.dragState.offsetX - rect.left;
         let newY = e.clientY - state.dragState.offsetY - rect.top;
@@ -177,14 +206,20 @@
         newX = Math.max(MIN_MARGIN, Math.min(newX, maxX));
         newY = Math.max(MIN_MARGIN, Math.min(newY, maxY));
 
+        // If we're in the control area, keep the controller just above it
         if (isInControlArea(video, e.clientX, e.clientY)) {
-          newY = parseFloat(controller.style.top) || MIN_MARGIN;
+          const controlAreaHeight = isYouTube ? 80 : (isVimeo ? 60 : CONTROL_HEIGHT);
+          newY = Math.min(newY, rect.height - controlAreaHeight - controller.offsetHeight - 10);
         }
 
-        controller.style.left = `${newX}px`;
-        controller.style.top = `${newY}px`;
+        controller.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
         updateControlsPosition();
-      });
+      };
+
+      if (rafCallbacks.has(video)) {
+        cancelAnimationFrame(rafCallbacks.get(video));
+      }
+      rafCallbacks.set(video, requestAnimationFrame(rafCallback));
     };
 
     const stopDrag = (e) => {
@@ -239,33 +274,34 @@
       }
     });
 
-    // Speed control handlers
-    const handleSpeedChange = (delta) => {
+    // Optimize speed control handlers with throttling
+    const handleSpeedChange = throttle((delta) => {
       video.playbackRate = Math.max(0.1, Math.min(16, video.playbackRate + delta));
       if (state.settings.rememberSpeed) {
         state.lastSpeed = video.playbackRate;
         chrome.storage.sync.set({ lastSpeed: video.playbackRate });
       }
       updateDisplay();
-    };
+    }, 50);
 
-    controller.querySelector('.vsc-slower').addEventListener('click', (e) => {
+    // Use passive event listeners where possible
+    slowerBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
       if (!state.dragState.isDragging) {
         handleSpeedChange(-state.settings.step);
       }
-    });
+    }, { passive: true });
 
-    controller.querySelector('.vsc-faster').addEventListener('click', (e) => {
+    fasterBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
       if (!state.dragState.isDragging) {
         handleSpeedChange(state.settings.step);
       }
-    });
+    }, { passive: true });
 
-    controller.querySelector('.vsc-reset').addEventListener('click', (e) => {
+    resetBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
       if (!state.dragState.isDragging) {
@@ -276,22 +312,21 @@
         }
         updateDisplay();
       }
-    });
+    }, { passive: true });
 
+    // Optimize display updates with debouncing
     let updateTimeout = null;
-    const updateDisplay = () => {
-      if (updateTimeout) return;
-      updateTimeout = setTimeout(() => {
-        if (video && document.contains(video)) {
-          display.textContent = `${video.playbackRate.toFixed(2)}×`;
-        }
-        updateTimeout = null;
-      }, 16);
-    };
+    const updateDisplay = debounce(() => {
+      if (video && document.contains(video)) {
+        display.textContent = `${video.playbackRate.toFixed(2)}×`;
+      }
+    }, 16);
 
-    // Video event listeners
-    ['play', 'loadeddata', 'ratechange', 'seeking'].forEach(event => {
-      video.addEventListener(event, updateDisplay);
+    // Optimize video event listeners
+    const videoEvents = ['play', 'loadeddata', 'ratechange', 'seeking'];
+    const handleVideoEvent = throttle(() => updateDisplay(), 50);
+    videoEvents.forEach(event => {
+      video.addEventListener(event, handleVideoEvent, { passive: true });
     });
 
     // Initialize
@@ -337,31 +372,43 @@
 
     // Cleanup
     const cleanup = () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      if (updateTimeout) clearTimeout(updateTimeout);
+      if (rafCallbacks.has(video)) {
+        cancelAnimationFrame(rafCallbacks.get(video));
+        rafCallbacks.delete(video);
+      }
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+      }
+      
+      // Remove all event listeners
       controller.removeEventListener('mousedown', startDrag);
       document.removeEventListener('mousemove', handleDrag);
       document.removeEventListener('mouseup', stopDrag);
-      ['play', 'loadeddata', 'ratechange', 'seeking'].forEach(event => {
-        video.removeEventListener(event, updateDisplay);
+      videoEvents.forEach(event => {
+        video.removeEventListener(event, handleVideoEvent);
       });
-      resizeObserver.disconnect();
-      mutationObserver.disconnect();
+      video.removeEventListener('ratechange', handleRateChange);
+      
+      // Clean up observers
+      if (resizeObserver) resizeObserver.disconnect();
+      if (mutationObserver) mutationObserver.disconnect();
+      
+      // Remove elements and clear maps
       controller.remove();
       videoControllers.delete(video);
       controllerPositions.delete(video);
+      videoStates.delete(video);
     };
 
     return cleanup;
   };
 
-  // Track videos
-  const trackVideos = () => {
+  // Optimize video tracking with throttling
+  const trackVideos = throttle(() => {
     if (isDisabledSite()) return;
 
     requestAnimationFrame(() => {
       document.querySelectorAll('video').forEach(video => {
-        // Set speed immediately when video is found, before controller creation
         if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
           video.playbackRate = state.lastSpeed;
         }
@@ -372,30 +419,35 @@
             state.activeVideo = video;
           }
 
-          // Watch for video loading
-          const handleLoad = () => {
+          // Optimize video load handling
+          const handleLoad = throttle(() => {
             if (state.settings.rememberSpeed && state.lastSpeed !== 1.0) {
               video.playbackRate = state.lastSpeed;
             }
-          };
+          }, 100);
 
-          // Add load event listeners
-          video.addEventListener('loadeddata', handleLoad);
-          video.addEventListener('loadedmetadata', handleLoad);
-          video.addEventListener('canplay', handleLoad);
+          video.addEventListener('loadeddata', handleLoad, { passive: true });
+          video.addEventListener('loadedmetadata', handleLoad, { passive: true });
+          video.addEventListener('canplay', handleLoad, { passive: true });
           
-          new MutationObserver(() => {
+          const observer = new MutationObserver(() => {
             if (!document.contains(video)) {
               video.removeEventListener('loadeddata', handleLoad);
               video.removeEventListener('loadedmetadata', handleLoad);
               video.removeEventListener('canplay', handleLoad);
               cleanup();
             }
-          }).observe(document.body, { childList: true, subtree: true });
+          });
+          observer.observe(document.body, { 
+            childList: true, 
+            subtree: true,
+            attributes: false,
+            characterData: false
+          });
         }
       });
     });
-  };
+  }, 100);
 
   // Also add a global video event listener
   document.addEventListener('play', (e) => {
@@ -407,11 +459,10 @@
     }
   }, true);
 
-  // Keyboard handler
-  const handleKey = (e) => {
+  // Optimize keyboard handler with throttling
+  const handleKey = throttle((e) => {
     if (isDisabledSite()) return;
 
-    // Check if user is typing in any input-like element
     const activeElement = document.activeElement;
     const isTyping = (
       activeElement.tagName === 'INPUT' ||
@@ -422,7 +473,7 @@
       activeElement.getAttribute('role') === 'combobox' ||
       activeElement.getAttribute('role') === 'searchbox' ||
       activeElement.closest('[contenteditable="true"]') ||
-      activeElement.closest('.CodeMirror') ||  // For code editors
+      activeElement.closest('.CodeMirror') ||
       activeElement.closest('[role="textbox"]') ||
       activeElement.closest('[role="combobox"]') ||
       activeElement.closest('[role="searchbox"]')
@@ -444,7 +495,7 @@
       e.preventDefault();
       actions[key]();
     }
-  };
+  }, 50);
 
   const adjustSpeed = (delta) => {
     if (!state.activeVideo) return;
@@ -488,7 +539,7 @@
   };
 
   // Settings update handler
-  chrome.runtime.onMessage.addListener((message) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'settingsUpdated') {
       const wasRememberSpeed = state.settings.rememberSpeed;
       const previousDisabledSites = [...state.settings.disabledSites];
@@ -512,20 +563,26 @@
       
       // Handle site status changes
       if (isNowDisabled && !wasDisabled) {
-        // Site was just disabled - remove all controllers
+        // Site was just disabled - remove all controllers and reset speeds
         document.querySelectorAll('video').forEach(video => {
           const controller = videoControllers.get(video);
           if (controller) {
-            // Reset speed to default if needed
-            if (wasRememberSpeed) {
-              video.playbackRate = 1.0;
-            }
+            // Reset speed to default
+            video.playbackRate = 1.0;
             // Clean up and remove controller
             controller.remove();
             videoControllers.delete(video);
             controllerPositions.delete(video);
+            videoStates.delete(video);
+            if (rafCallbacks.has(video)) {
+              cancelAnimationFrame(rafCallbacks.get(video));
+              rafCallbacks.delete(video);
+            }
           }
         });
+        // Remove event listeners if site is disabled
+        document.removeEventListener('keydown', handleKey);
+        window.removeEventListener('resize', () => requestAnimationFrame(trackVideos));
       } else if (!isNowDisabled && wasDisabled) {
         // Site was just enabled - add controllers to all videos
         document.querySelectorAll('video').forEach(video => {
@@ -533,6 +590,9 @@
             createController(video);
           }
         });
+        // Re-add event listeners if site is enabled
+        document.addEventListener('keydown', handleKey);
+        window.addEventListener('resize', () => requestAnimationFrame(trackVideos));
       } else if (!isNowDisabled) {
         // Site remains enabled - update existing controllers
         document.querySelectorAll('video').forEach(video => {
@@ -540,7 +600,7 @@
           const previousState = videoStates.get(video);
           
           if (controller) {
-            // Only update visual properties
+            // Update visual properties
             controller.style.opacity = state.settings.opacity;
             controller.style.display = state.settings.hideController ? 'none' : 'block';
             
@@ -555,7 +615,12 @@
           }
         });
       }
+      
+      // Send response to confirm settings were updated
+      sendResponse({ success: true });
     }
+    // Return true to indicate we'll send a response asynchronously
+    return true;
   });
 
   // Initialize
@@ -564,6 +629,86 @@
     const { lastSpeed, ...settings } = items;
     Object.assign(state.settings, settings);
     state.lastSpeed = lastSpeed;
+
+    // Listen for storage changes
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+      if (namespace === 'sync') {
+        const wasRememberSpeed = state.settings.rememberSpeed;
+        const previousDisabledSites = [...state.settings.disabledSites];
+        const wasDisabled = previousDisabledSites.some(site => {
+          const hostname = window.location.hostname.replace('www.', '');
+          return hostname === site || hostname.endsWith('.' + site);
+        });
+
+        // Update settings from changes
+        Object.keys(changes).forEach(key => {
+          if (key === 'lastSpeed') {
+            state.lastSpeed = changes[key].newValue;
+          } else if (key === 'keys') {
+            state.settings.keys = changes[key].newValue;
+          } else if (key === 'disabledSites') {
+            state.settings.disabledSites = changes[key].newValue;
+          } else {
+            state.settings[key] = changes[key].newValue;
+          }
+        });
+
+        const isNowDisabled = isDisabledSite();
+        
+        // Handle site status changes
+        if (isNowDisabled && !wasDisabled) {
+          // Site was just disabled - remove all controllers and reset speeds
+          document.querySelectorAll('video').forEach(video => {
+            const controller = videoControllers.get(video);
+            if (controller) {
+              // Reset speed to default
+              video.playbackRate = 1.0;
+              // Clean up and remove controller
+              controller.remove();
+              videoControllers.delete(video);
+              controllerPositions.delete(video);
+              videoStates.delete(video);
+              if (rafCallbacks.has(video)) {
+                cancelAnimationFrame(rafCallbacks.get(video));
+                rafCallbacks.delete(video);
+              }
+            }
+          });
+          // Remove event listeners if site is disabled
+          document.removeEventListener('keydown', handleKey);
+          window.removeEventListener('resize', () => requestAnimationFrame(trackVideos));
+        } else if (!isNowDisabled && wasDisabled) {
+          // Site was just enabled - add controllers to all videos
+          document.querySelectorAll('video').forEach(video => {
+            if (!videoControllers.has(video) && video.offsetWidth > 50) {
+              createController(video);
+            }
+          });
+          // Re-add event listeners if site is enabled
+          document.addEventListener('keydown', handleKey);
+          window.addEventListener('resize', () => requestAnimationFrame(trackVideos));
+        } else if (!isNowDisabled) {
+          // Site remains enabled - update existing controllers
+          document.querySelectorAll('video').forEach(video => {
+            const controller = videoControllers.get(video);
+            if (controller) {
+              // Update visual properties
+              controller.style.opacity = state.settings.opacity;
+              controller.style.display = state.settings.hideController ? 'none' : 'block';
+              
+              // Keep current speed unless remember speed setting changed
+              if (state.settings.rememberSpeed && !wasRememberSpeed) {
+                state.lastSpeed = video.playbackRate;
+                chrome.storage.sync.set({ lastSpeed: video.playbackRate });
+              }
+            } else if (video.offsetWidth > 50) {
+              // Create controller for any videos that don't have one
+              createController(video);
+            }
+          });
+        }
+      }
+    });
 
     if (!isDisabledSite()) {
       // Set speed for any existing videos immediately
