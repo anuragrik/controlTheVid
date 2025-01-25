@@ -408,7 +408,26 @@
 
   // Keyboard handler
   const handleKey = (e) => {
-    if (isDisabledSite() || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+    if (isDisabledSite()) return;
+
+    // Check if user is typing in any input-like element
+    const activeElement = document.activeElement;
+    const isTyping = (
+      activeElement.tagName === 'INPUT' ||
+      activeElement.tagName === 'TEXTAREA' ||
+      activeElement.tagName === 'SELECT' ||
+      activeElement.isContentEditable ||
+      activeElement.getAttribute('role') === 'textbox' ||
+      activeElement.getAttribute('role') === 'combobox' ||
+      activeElement.getAttribute('role') === 'searchbox' ||
+      activeElement.closest('[contenteditable="true"]') ||
+      activeElement.closest('.CodeMirror') ||  // For code editors
+      activeElement.closest('[role="textbox"]') ||
+      activeElement.closest('[role="combobox"]') ||
+      activeElement.closest('[role="searchbox"]')
+    );
+
+    if (isTyping) return;
 
     const key = e.key.toLowerCase();
     const actions = {
