@@ -1,0 +1,24 @@
+{
+  "manifest_version": 2,
+  "name": "Video Speed+",
+  "version": "2.1",
+  "description": "Robust video speed control for all embedded content",
+  "permissions": ["storage", "activeTab"],
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content/content.js"],
+    "css": ["content/content.css"],
+    "run_at": "document_end",
+    "all_frames": true
+  }],
+  "options_ui": {
+    "page": "options/options.html",
+    "chrome_style": false,
+    "open_in_tab": true
+  },
+  "icons": {
+    "48": "assets/icon-48.png",
+    "96": "assets/icon-96.png",
+    "128": "assets/icon-128.png"
+  }
+}

@@ -1,0 +1,16 @@
+.vsc-controller {
+    contain: layout style paint;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  
+  .vsc-controller::before {
+    content: '';
+    position: fixed;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    z-index: -1;
+    pointer-events: auto;
+  }

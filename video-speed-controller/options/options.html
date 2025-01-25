@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Video Speed+ Settings</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --background: #f8fafc;
+    }
+    
+    body {
+      font-family: system-ui;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 24px;
+      background: var(--background);
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 16px 0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .input-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #1e293b;
+    }
+
+    input[type="number"], input[type="text"] {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .status {
+      padding: 12px;
+      margin-top: 16px;
+      border-radius: 6px;
+      background: #dcfce7;
+      color: #166534;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Video Speed+ Settings</h1>
+  
+  <div class="card">
+    <h2>Core Settings</h2>
+    <div class="grid">
+      <div class="input-group">
+        <label>Speed Step</label>
+        <input type="number" id="step" step="0.1" min="0.1" max="2">
+      </div>
+      <div class="input-group">
+        <label>Rewind Seconds</label>
+        <input type="number" id="rewind" min="1" max="60">
+      </div>
+      <div class="input-group">
+        <label>UI Opacity</label>
+        <input type="number" id="opacity" step="0.1" min="0.1" max="1">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Keyboard Shortcuts</h2>
+    <div class="grid">
+      <div class="input-group">
+        <label>Decrease Speed</label>
+        <input type="text" id="keySlow" maxlength="1" class="key-input">
+      </div>
+      <div class="input-group">
+        <label>Increase Speed</label>
+        <input type="text" id="keyFast" maxlength="1" class="key-input">
+      </div>
+      <div class="input-group">
+        <label>Reset Speed</label>
+        <input type="text" id="keyReset" maxlength="1" class="key-input">
+      </div>
+    </div>
+  </div>
+
+  <button id="save">Save Settings</button>
+  <div class="status" id="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>
